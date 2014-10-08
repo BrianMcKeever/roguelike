@@ -1,0 +1,1 @@
+cabal install gloss-raster --ghc-options="-fasm"
