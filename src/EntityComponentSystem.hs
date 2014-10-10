@@ -1,5 +1,9 @@
-module EntityComponentSystem
-    (Component, Components, createEntity, Entity)
+module EntityComponentSystem (
+    Component, 
+    Components, 
+    createEntity, 
+    Entity
+)
 where
 import qualified Data.HashSet as Set
 import Control.Monad.State.Lazy
