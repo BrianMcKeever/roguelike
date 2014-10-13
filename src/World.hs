@@ -1,15 +1,21 @@
 module World (
-    createWorld, 
+    createEntity,
+--    createWorld, 
+    GameState,
+    initialGameState,
+--    initialWorld,
     World
 )
 where
-import Components.Position
+--import Components.Position
+import Control.Monad.State.Lazy
 import qualified Data.Map as Map
 import qualified Data.HashSet as Set
 import EntityComponentSystem
 import Graphics.Gloss.Game
 import System.Random
 
+{-
 generateRandomBetween ::(Int, Int) -> World -> (Int, World)
 generateRandomBetween range world = (roll, world')
     where
@@ -45,9 +51,6 @@ createWorld tiles = do
     bricks <- map (flip (createRow tiles) positionState') [minimumCoordinate.. maximumCoordinate]
     return World {entities = bricks, positionState = positionState'}
 
-initialWorld :: World
-initialWorld = {entitySerial = 0, randomState = 0, entities = [], positionState = initialPositionState}
-
 maximumCoordinate :: Int
 maximumCoordinate = 100
 
@@ -56,5 +59,23 @@ minimumCoordinate = (-100)
 
 oddsOfTree :: Int
 oddsOfTree = 20
+--}
 
-data World = World {entitySerial :: Int, entities :: [Entity], positionState :: PositionState}
+createEntity :: World Entity
+createEntity = do
+    gameState <- get
+    let serial = entitySerial gameState
+    let entity = Entity serial $ componentsFromList []
+    let entities' = Map.insert serial entity $ entities gameState
+    put gameState {entitySerial = serial + 1, entities = entities'}
+    return entity
+
+data GameState = GameState {entitySerial :: Int, entities :: (Map.Map Serial Entity)}--, positionState :: PositionState}
+
+initialGameState :: GameState
+initialGameState = GameState{entitySerial = 0, entities = Map.empty} --randomState = 0, entities = [], positionState = initialPositionState}
+
+--initialWorld :: World GameState
+--initialWorld = runState get initialGameState
+
+type World = State GameState 
