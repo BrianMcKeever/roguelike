@@ -1,26 +1,37 @@
 module EntityComponentSystem (
-    Component, 
+    Component(..), 
+    componentInsert,
     Components, 
-    createEntity, 
-    Entity
+    componentsFromList,
+    Entity(..),
+    Serial
 )
 where
-import qualified Data.HashSet as Set
-import Control.Monad.State.Lazy
+import qualified Data.Set as Set
 
-data Component = Component String (Maybe Entity -> Entity)
-type Components = Set.HashSet Component
+data Component = Component 
+    Float                             --Priority
+    String                            --Name
 
-data Entity = Entity Int Components 
-type EntityManagement = State Int
+componentInsert :: Component -> Components -> Components
+componentInsert component components = Set.insert component components
 
-generateEntityId :: EntityManagement Int
-generateEntityId = do
-    n <- get
-    put (n+1)
-    return n
+instance Eq Component where
+    (Component priority1 name1) == (Component priority2 name2) = priority1 == priority2 && name1 == name2
 
-createEntity :: EntityManagement Entity
-createEntity = do
-    serial <- generateEntityId
-    return $ Entity serial Set.empty
+instance Ord Component where
+    compare (Component priority1 name1) (Component priority2 name2) 
+        | priority1 > priority2 = GT 
+        | priority1 < priority2 = LT 
+        | name1 > name2 = GT 
+        | name1 < name2 = LT 
+        | otherwise = EQ
+
+type Components = Set.Set Component
+
+componentsFromList :: [Component] -> Components
+componentsFromList = Set.fromList
+
+data Entity = Entity Serial Components 
+
+type Serial = Int
