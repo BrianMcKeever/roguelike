@@ -2,7 +2,7 @@ module EntityComponentSystem (
     Component(..), 
     componentInsert,
     Components, 
-    componentsFromList,
+    emptyComponents,
     Entity(..),
     Serial
 )
@@ -29,8 +29,8 @@ instance Ord Component where
 
 type Components = Set.Set Component
 
-componentsFromList :: [Component] -> Components
-componentsFromList = Set.fromList
+emptyComponents :: Components
+emptyComponents = Set.empty
 
 data Entity = Entity Serial Components 
 

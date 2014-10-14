@@ -1,7 +1,7 @@
 module Components.Position (
     addPosition,
     Coordinate,
-    createPositionState,
+    initialPositionState,
     PositionState,
     setPosition
 )
@@ -9,11 +9,11 @@ where
 import EntityComponentSystem
 import qualified Data.Map.Lazy as Map
 
-addPosition :: Coordinate -> World -> Entity -> (Entity, World)
-addPosition coordinate world (Entity serial components) = (entity', world')
+addPosition :: Coordinate -> PositionState -> Entity -> (Entity, PositionState)
+addPosition coordinate positionState (Entity serial components) = (entity', positionState')
     where
     entity' = Entity serial $ componentInsert positionComponent components
-    world' = setPosition coordinate entity' world
+    positionState' = setPosition coordinate entity' positionState
 
 type Coordinate = (Int, Int)
 
@@ -25,5 +25,5 @@ positionComponent = Component 0 "position"
 
 type PositionState = Map.Map Serial Coordinate
 
-setPosition :: Coordinate -> Entity -> World -> World
-setPosition coordinate (Entity serial _) world@{positionState = positionState'} = world {positionState = Map.insert serial coordinate positionState'}
+setPosition :: Coordinate -> Entity -> PositionState -> PositionState
+setPosition coordinate (Entity serial _) positionState = Map.insert serial coordinate positionState
