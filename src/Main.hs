@@ -2,6 +2,7 @@ import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import EntityComponentSystem
+import GameState
 import Graphics.Gloss.Game hiding (play)
 import Graphics.Gloss.Interface.Pure.Game
 import Tiles

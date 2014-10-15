@@ -1,16 +1,13 @@
 module World (
-    GameState(..),
-    initialGameState,
-    loadMap,
-    updateFunctions
+    loadMap
 )
 where
 import Components.Position
-import Components.Renderable
+--import Components.Renderable
+import GameState
 import qualified Data.Map as Map
 import qualified Data.List as List
 import EntityComponentSystem
-import Graphics.Gloss.Game
 import System.Random
 
 createBrick :: Int -> Int -> GameState -> GameState
@@ -36,16 +33,11 @@ createEntity gameState = (entity, gameState')
 createRow :: Int -> GameState -> GameState
 createRow y gameState = List.foldl' (flip (flip createBrick y)) gameState [minimumCoordinate.. maximumCoordinate] 
 
-data GameState = GameState {entitySerial :: Int, entities :: (Map.Map Serial Entity), positionState :: PositionState, randomState :: StdGen}
-
 generateRandomBetween ::(Int, Int) -> GameState -> (Int, GameState)
 generateRandomBetween range gameState = (roll, gameState')
     where
     (roll, randomState') = randomR range $ randomState gameState
     gameState' = gameState{randomState = randomState'}
-
-initialGameState :: GameState
-initialGameState = GameState{entitySerial = 0, entities = Map.empty, randomState = mkStdGen 0, positionState = initialPositionState}
 
 loadMap :: GameState -> GameState
 loadMap gameState =  List.foldl' (flip createRow) gameState [minimumCoordinate.. maximumCoordinate] 
@@ -58,13 +50,3 @@ minimumCoordinate = (-100)
 
 oddsOfTree :: Int
 oddsOfTree = 20
-
-updateFunctions :: Map.Map Component (GameState -> Entity -> GameState)
-updateFunctions = Map.fromList  [
-    (positionComponent, pass),
-    (renderableComponent, pass)
-    ]
-    where
-    pass gameState _ = gameState
--- I decided to store my update functions in this dictionary instead of each
--- component because storing them in each component would cause circular imports
