@@ -1,23 +1,27 @@
 module Components.Position (
     addPosition,
-    Coordinate,
+    getPosition,
     initialPositionState,
+    Point,
     positionComponent,
     PositionState,
     setPosition
 )
 where
 import EntityComponentSystem
+import Graphics.Gloss.Game
+import Graphics.Gloss.Data.Point
 import qualified Data.Map.Lazy as Map
 import StringTable.Atom
 
-addPosition :: Coordinate -> PositionState -> Entity -> (Entity, PositionState)
+addPosition :: Point -> PositionState -> Entity -> (Entity, PositionState)
 addPosition coordinate positionState (Entity serial components) = (entity', positionState')
     where
     entity' = Entity serial $ componentInsert positionComponent components
     positionState' = setPosition coordinate entity' positionState
 
-type Coordinate = (Int, Int)
+getPosition :: PositionState -> Entity -> Point
+getPosition state (Entity serial components) = state Map.! serial
 
 initialPositionState :: PositionState
 initialPositionState = Map.empty
@@ -25,7 +29,8 @@ initialPositionState = Map.empty
 positionComponent :: Component
 positionComponent = Component 0 $ toAtom "position"
 
-type PositionState = Map.Map Serial Coordinate
+type PositionState = Map.Map Serial Point
 
-setPosition :: Coordinate -> Entity -> PositionState -> PositionState
+setPosition :: Point -> Entity -> PositionState -> PositionState
 setPosition coordinate (Entity serial _) positionState = Map.insert serial coordinate positionState
+

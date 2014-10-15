@@ -10,7 +10,7 @@ import qualified Data.List as List
 import EntityComponentSystem
 import System.Random
 
-createBrick :: Int -> Int -> GameState -> GameState
+createBrick :: Float -> Float -> GameState -> GameState
 createBrick x y gameState = gameState''{positionState = positionState'}
     where
     (roll, gameState') = generateRandomBetween (0, 100) gameState
@@ -30,7 +30,7 @@ createEntity gameState = (entity, gameState')
     entities' = Map.insert serial entity $ entities gameState
     gameState' = gameState {entitySerial = serial + 1, entities = entities'}
 
-createRow :: Int -> GameState -> GameState
+createRow :: Float -> GameState -> GameState
 createRow y gameState = List.foldl' (flip (flip createBrick y)) gameState [minimumCoordinate.. maximumCoordinate] 
 
 generateRandomBetween ::(Int, Int) -> GameState -> (Int, GameState)
@@ -42,10 +42,10 @@ generateRandomBetween range gameState = (roll, gameState')
 loadMap :: GameState -> GameState
 loadMap gameState =  List.foldl' (flip createRow) gameState [minimumCoordinate.. maximumCoordinate] 
 
-maximumCoordinate :: Int
+maximumCoordinate :: Float
 maximumCoordinate = 100
 
-minimumCoordinate :: Int
+minimumCoordinate :: Float
 minimumCoordinate = (-100)
 
 oddsOfTree :: Int

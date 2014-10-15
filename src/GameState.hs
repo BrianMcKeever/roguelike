@@ -16,7 +16,8 @@ data GameState = GameState {
     entities :: (Map.Map Serial Entity), 
     positionState :: PositionState, 
     randomState :: StdGen, 
-    renderFunctions :: (Map.Map Serial (Float -> GameState -> GameState)),
+    renderFunctions :: (Map.Map Serial (Float -> GameState -> Entity -> GameState)),
+    tiles :: (Map.Map String Picture),
     toBeRendered :: [Picture]}
 
 initialGameState :: GameState
@@ -26,14 +27,15 @@ initialGameState = GameState{
     randomState = mkStdGen 0, 
     positionState = initialPositionState,
     renderFunctions = Map.empty,
+    tiles = Map.empty,
     toBeRendered =  []}
 
-updateFunctions :: Map.Map Component (GameState -> Entity -> GameState)
+updateFunctions :: Map.Map Component (Float -> GameState -> Entity -> GameState)
 updateFunctions = Map.fromList  [
     (positionComponent, pass),
     (renderableComponent, pass)
     ]
     where
-    pass gameState _ = gameState
+    pass _ gameState _ = gameState
 -- I decided to store my update functions in this dictionary instead of each
 -- component because storing them in each component would cause circular imports
