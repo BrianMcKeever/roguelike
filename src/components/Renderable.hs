@@ -14,4 +14,4 @@ data RenderData = RenderData ZIndex Picture
 
 type RenderableState = Map.Map Serial RenderData
 
-data ZIndex = Earth | Blood | Ground | Entity | Effect
+data ZIndex = Earth | Blood | Feet | Body | Head | Sky deriving (Eq, Ord)

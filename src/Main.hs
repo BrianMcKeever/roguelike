@@ -1,6 +1,6 @@
 import qualified Data.List as List
 import qualified Data.Map as Map
-import Data.Maybe
+import qualified Data.Set as Set
 import EntityComponentSystem
 import Graphics.Gloss.Game hiding (play)
 import Graphics.Gloss.Interface.Pure.Game
@@ -8,6 +8,10 @@ import Tiles
 import World
 
 draw :: Map.Map String Picture -> GameState -> Picture
+-- Give me all of the entities within the screens bounds.
+-- Collect all of their sprites.
+-- Sort those by Z index.
+-- Display them in order of Z index
 draw tiles _ = pictures [ 
     translate  100  100 (tiles Map.! "grass"),
     translate  100  100 (tiles Map.! "tree")
@@ -28,20 +32,22 @@ update tick = updateGraphics tick . updateGame tick
 updateGame :: Float -> GameState -> GameState
 updateGame _ gameState = List.foldl' updateEntity gameState $ Map.keys $ entities gameState 
     where
-    ifEntity gameState serial f = maybe gameState f $ Map.lookup serial $ entities gameState
+    ifEntity gameState' serial f = maybe gameState' f $ Map.lookup serial $ entities gameState'
 
     updateEntity :: GameState -> Serial -> GameState
-    updateEntity gameState serial = ifEntity gameState serial f
+    updateEntity gameState' serial = ifEntity gameState' serial f
         where
-        f (Entity serial components) = componentFoldl (updateComponent serial) gameState components
+        f (Entity _ components) = componentFoldl (updateComponent serial) gameState' components
     -- I'm passing serial numbers instead of entity instances because
     -- passing old copies of possibly updated entities would cause
     -- problems.    
 
     updateComponent :: Serial -> GameState -> Component -> GameState
-    updateComponent serial gameState component = ifEntity gameState serial f
+    updateComponent serial gameState' component = ifEntity gameState' serial f
         where
-        f entity = (updateFunctions Map.! component) gameState entity
+        f entity@(Entity _ components) = if Set.notMember component components
+            then gameState' 
+            else (updateFunctions Map.! component) gameState' entity
     --Passing old copies of components doesn't matter because they store their
     --state in game state.
 
