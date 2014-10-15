@@ -10,10 +10,11 @@ module EntityComponentSystem (
 )
 where
 import qualified Data.Set as Set
+import StringTable.Atom
 
 data Component = Component 
     Float                             --Priority
-    String                            --Name
+    Atom                            --Name
 
 componentFoldl :: (a -> Component -> a) -> a -> Components -> a
 componentFoldl = Set.foldl'

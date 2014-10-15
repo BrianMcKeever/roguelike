@@ -28,12 +28,7 @@ update tick = updateGraphics tick . updateGame tick
 updateGame :: Float -> GameState -> GameState
 updateGame _ gameState = List.foldl' updateEntity gameState $ Map.keys $ entities gameState 
     where
-    ifEntity gameState serial f = returnValue
-        where
-        maybeEntity = Map.lookup serial $ entities gameState
-        returnValue = case maybeEntity of
-            Nothing -> gameState
-            Just entity -> f entity
+    ifEntity gameState serial f = maybe gameState f $ Map.lookup serial $ entities gameState
 
     updateEntity :: GameState -> Serial -> GameState
     updateEntity gameState serial = ifEntity gameState serial f

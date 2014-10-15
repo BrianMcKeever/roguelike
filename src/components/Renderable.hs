@@ -5,12 +5,13 @@ where
 import EntityComponentSystem
 import Graphics.Gloss.Game
 import qualified Data.Map.Lazy as Map
+import StringTable.Atom
 
 renderableComponent :: Component
-renderableComponent = Component 0 "renderable"
+renderableComponent = Component 0 $ toAtom "renderable"
 
 data RenderData = RenderData ZIndex Picture
 
 type RenderableState = Map.Map Serial RenderData
 
-type ZIndex = Int
+data ZIndex = Earth | Blood | Ground | Entity | Effect

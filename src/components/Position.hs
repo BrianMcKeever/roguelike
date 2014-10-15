@@ -9,6 +9,7 @@ module Components.Position (
 where
 import EntityComponentSystem
 import qualified Data.Map.Lazy as Map
+import StringTable.Atom
 
 addPosition :: Coordinate -> PositionState -> Entity -> (Entity, PositionState)
 addPosition coordinate positionState (Entity serial components) = (entity', positionState')
@@ -22,7 +23,7 @@ initialPositionState :: PositionState
 initialPositionState = Map.empty
 
 positionComponent :: Component
-positionComponent = Component 0 "position"
+positionComponent = Component 0 $ toAtom "position"
 
 type PositionState = Map.Map Serial Coordinate
 
