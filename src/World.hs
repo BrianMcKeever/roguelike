@@ -1,23 +1,27 @@
 module World (
-    GameState,
+    GameState(..),
     initialGameState,
-    loadMap
+    loadMap,
+    updateFunctions
 )
 where
 import Components.Position
+import Components.Renderable
 import qualified Data.Map as Map
 import qualified Data.List as List
 import EntityComponentSystem
 import Graphics.Gloss.Game
 import System.Random
 
-createBrick :: Map.Map String Picture -> Int -> Int -> GameState -> GameState
-createBrick tiles x y gameState = gameState''{positionState = positionState'}
+createBrick :: Int -> Int -> GameState -> GameState
+createBrick x y gameState = gameState''{positionState = positionState'}
     where
     (roll, gameState') = generateRandomBetween (0, 100) gameState
+    {-
     tile = if roll < oddsOfTree
         then tiles Map.! "grass"
         else tiles Map.! "tree"
+        -}
     (entity, gameState'') = createEntity gameState'
     positionState' = snd $ addPosition (x, y) (positionState gameState) entity
 
@@ -29,8 +33,8 @@ createEntity gameState = (entity, gameState')
     entities' = Map.insert serial entity $ entities gameState
     gameState' = gameState {entitySerial = serial + 1, entities = entities'}
 
-createRow :: Map.Map String Picture -> Int -> GameState -> GameState
-createRow tiles y gameState = List.foldl' (flip (flip (createBrick tiles) y)) gameState [minimumCoordinate.. maximumCoordinate] 
+createRow :: Int -> GameState -> GameState
+createRow y gameState = List.foldl' (flip (flip createBrick y)) gameState [minimumCoordinate.. maximumCoordinate] 
 
 data GameState = GameState {entitySerial :: Int, entities :: (Map.Map Serial Entity), positionState :: PositionState, randomState :: StdGen}
 
@@ -43,8 +47,8 @@ generateRandomBetween range gameState = (roll, gameState')
 initialGameState :: GameState
 initialGameState = GameState{entitySerial = 0, entities = Map.empty, randomState = mkStdGen 0, positionState = initialPositionState}
 
-loadMap :: GameState -> Map.Map String Picture -> GameState
-loadMap gameState tiles =  List.foldl' (flip (createRow tiles)) gameState [minimumCoordinate.. maximumCoordinate] 
+loadMap :: GameState -> GameState
+loadMap gameState =  List.foldl' (flip createRow) gameState [minimumCoordinate.. maximumCoordinate] 
 
 maximumCoordinate :: Int
 maximumCoordinate = 100
@@ -54,3 +58,13 @@ minimumCoordinate = (-100)
 
 oddsOfTree :: Int
 oddsOfTree = 20
+
+updateFunctions :: Map.Map Component (GameState -> Entity -> GameState)
+updateFunctions = Map.fromList  [
+    (positionComponent, pass),
+    (renderableComponent, pass)
+    ]
+    where
+    pass gameState _ = gameState
+-- I decided to store my update functions in this dictionary instead of each
+-- component because storing them in each component would cause circular imports

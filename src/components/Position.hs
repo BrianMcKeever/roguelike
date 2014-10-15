@@ -2,6 +2,7 @@ module Components.Position (
     addPosition,
     Coordinate,
     initialPositionState,
+    positionComponent,
     PositionState,
     setPosition
 )

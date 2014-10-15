@@ -1,6 +1,8 @@
 module EntityComponentSystem (
     Component(..), 
+    componentFoldl,
     componentInsert,
+    componentsToList,
     Components, 
     emptyComponents,
     Entity(..),
@@ -13,8 +15,14 @@ data Component = Component
     Float                             --Priority
     String                            --Name
 
+componentFoldl :: (a -> Component -> a) -> a -> Components -> a
+componentFoldl = Set.foldl'
+
 componentInsert :: Component -> Components -> Components
 componentInsert component components = Set.insert component components
+
+componentsToList :: Components -> [Component]
+componentsToList = Set.toAscList
 
 instance Eq Component where
     (Component priority1 name1) == (Component priority2 name2) = priority1 == priority2 && name1 == name2
