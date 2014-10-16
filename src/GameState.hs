@@ -4,7 +4,7 @@ module GameState (
     updateFunctions
 )
 where
-import Components.Position
+import Components.PositionBase
 import Components.Renderable
 import qualified Data.Map as Map
 import EntityComponentSystem

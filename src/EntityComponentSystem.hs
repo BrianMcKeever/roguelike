@@ -1,26 +1,27 @@
 module EntityComponentSystem (
+    addComponent,
     Component(..), 
     componentFoldl,
-    componentInsert,
     componentsToList,
     Components, 
     emptyComponents,
     Entity(..),
+    Kind,
     Serial
 )
 where
 import qualified Data.Set as Set
 import StringTable.Atom
 
+addComponent :: Entity -> Component -> Entity
+addComponent (Entity serial kind components) component = Entity serial kind $ Set.insert component components
+
 data Component = Component 
     Float                             --Priority
-    Atom                            --Name
+    Atom                              --Name
 
 componentFoldl :: (a -> Component -> a) -> a -> Components -> a
 componentFoldl = Set.foldl'
-
-componentInsert :: Component -> Components -> Components
-componentInsert component components = Set.insert component components
 
 componentsToList :: Components -> [Component]
 componentsToList = Set.toAscList
@@ -41,6 +42,7 @@ type Components = Set.Set Component
 emptyComponents :: Components
 emptyComponents = Set.empty
 
-data Entity = Entity Serial Components 
+data Entity = Entity Serial Kind Components 
 
+type Kind = Atom
 type Serial = Int

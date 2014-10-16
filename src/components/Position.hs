@@ -1,36 +1,41 @@
 module Components.Position (
     addPosition,
     getPosition,
-    initialPositionState,
     Point,
     positionComponent,
-    PositionState,
-    setPosition
+    setPosition,
+    withinBox
 )
 where
 import EntityComponentSystem
-import Graphics.Gloss.Game
+import GameState
 import Graphics.Gloss.Data.Point
+import Graphics.Gloss.Game
 import qualified Data.Map.Lazy as Map
-import StringTable.Atom
+import Components.PositionBase
 
-addPosition :: Point -> PositionState -> Entity -> (Entity, PositionState)
-addPosition coordinate positionState (Entity serial components) = (entity', positionState')
+addPosition :: Point -> GameState -> Entity -> (Entity, GameState)
+addPosition coordinate gameState entity = (entity', gameState')
     where
-    entity' = Entity serial $ componentInsert positionComponent components
-    positionState' = setPosition coordinate entity' positionState
+    entity' = addComponent entity positionComponent
+    gameState' = setPosition coordinate entity' gameState
 
-getPosition :: PositionState -> Entity -> Point
-getPosition state (Entity serial components) = state Map.! serial
+getPosition :: GameState -> Entity -> Point
+getPosition gameState (Entity serial _ _) = (positionState gameState) Map.! serial
 
-initialPositionState :: PositionState
-initialPositionState = Map.empty
+rectangleToCornerPoints :: Rect -> (Point, Point)
+rectangleToCornerPoints ((x, y), (width, height)) = (((x - halfWidth), (y - halfHeight)), ((x + halfWidth), (y + halfHeight)))
+    where
+    halfWidth = width/2
+    halfHeight = height/2
 
-positionComponent :: Component
-positionComponent = Component 0 $ toAtom "position"
+setPosition :: Point -> Entity -> GameState -> GameState
+setPosition coordinate (Entity serial _ _) gameState = gameState{positionState = positionState'}
+    where
+    positionState' = Map.insert serial coordinate $ positionState gameState
 
-type PositionState = Map.Map Serial Point
-
-setPosition :: Point -> Entity -> PositionState -> PositionState
-setPosition coordinate (Entity serial _) positionState = Map.insert serial coordinate positionState
-
+withinBox :: GameState -> Rect -> Entity -> Bool
+withinBox gameState box entity = pointInBox entityPosition leftCorner rightCorner
+    where
+    entityPosition = getPosition gameState entity
+    (leftCorner, rightCorner) = rectangleToCornerPoints box
