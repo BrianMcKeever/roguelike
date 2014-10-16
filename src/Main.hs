@@ -11,9 +11,6 @@ import Graphics.Gloss.Interface.Pure.Game
 import Tiles
 import World
 
-hasComponent :: Entity -> Component -> Bool
-hasComponent (Entity _ _ components) component = Set.member component components
-
 draw :: GameState -> Picture
 draw gameState = pictures $ toBeRendered gameState
 

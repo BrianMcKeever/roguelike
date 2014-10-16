@@ -6,6 +6,7 @@ module EntityComponentSystem (
     Components, 
     emptyComponents,
     Entity(..),
+    hasComponent,
     Kind,
     Serial
 )
@@ -43,6 +44,9 @@ emptyComponents :: Components
 emptyComponents = Set.empty
 
 data Entity = Entity Serial Kind Components 
+
+hasComponent :: Entity -> Component -> Bool
+hasComponent (Entity _ _ components) component = Set.member component components
 
 type Kind = Atom
 type Serial = Int
