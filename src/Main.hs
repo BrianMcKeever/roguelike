@@ -1,7 +1,9 @@
 import Components.Position
 import Components.Renderable
+import Components.RenderKindFunctions
 import qualified Data.List as List
 import qualified Data.Map as Map
+import Data.Maybe
 import qualified Data.Set as Set
 import EntityComponentSystem
 import GameState
@@ -10,16 +12,14 @@ import Graphics.Gloss.Game hiding (play)
 import Graphics.Gloss.Interface.Pure.Game
 import Tiles
 import World
+--import Debug.Trace
 
 draw :: GameState -> Picture
-draw gameState = pictures $ toBeRendered gameState
+draw gameState = pictures pictureList
+    where
+    pictureOnly (RenderData _ p) = p
+    pictureList = map pictureOnly $ toBeRendered gameState
 
-{-[ 
-    translate  100  100 (tiles Map.! "grass"),
-    translate  100  100 (tiles Map.! "tree")
-    ]
-    -}
-    
 handleInput :: Event -> GameState -> GameState
 handleInput _event gameState = gameState
 
@@ -33,7 +33,16 @@ update :: Float -> GameState -> GameState
 update tick = updateGraphics tick . updateGame tick 
 
 updateEntityGraphic :: Float -> GameState -> Entity -> GameState
-updateEntityGraphic tick gameState entity@(Entity serial _ _) = ((renderFunctions gameState) Map.! serial) tick gameState entity
+updateEntityGraphic tick gameState entity@(Entity serial kind _) = renderFunction tick gameState' entity
+    where
+    renderFunctions' = renderFunctions gameState
+    maybeRenderFunction = Map.lookup serial renderFunctions'
+    (renderFunction, gameState') = if isJust maybeRenderFunction
+        then (fromJust maybeRenderFunction, gameState)
+        else let renderFunction' = renderKindFunctions Map.! kind in
+            (renderFunction', gameState{renderFunctions = Map.insert serial renderFunction renderFunctions'})
+            --I'm loading the render function here because doing it in a saner
+            --place causes circular imports
 
 updateGame :: Float -> GameState -> GameState
 updateGame tick gameState = List.foldl' updateEntity gameState $ Map.keys $ entities gameState 

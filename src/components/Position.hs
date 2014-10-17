@@ -15,10 +15,10 @@ import qualified Data.Map.Lazy as Map
 import Components.PositionBase
 
 addPosition :: Point -> GameState -> Entity -> (Entity, GameState)
-addPosition coordinate gameState entity = (entity', gameState')
+addPosition coordinate gameState entity = (entity', gameState'')
     where
-    entity' = addComponent entity positionComponent
-    gameState' = setPosition coordinate entity' gameState
+    (entity', gameState') = addComponent gameState entity positionComponent
+    gameState'' = setPosition coordinate entity' gameState'
 
 getPosition :: GameState -> Entity -> Point
 getPosition gameState (Entity serial _ _) = (positionState gameState) Map.! serial

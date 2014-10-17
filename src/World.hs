@@ -1,43 +1,34 @@
 module World (
-    loadMap
+    groundBrick,
+    loadMap,
+    tree,
+    renderGround
 )
 where
 import Components.Position
---import Components.Renderable
-import GameState
-import qualified Data.Map as Map
+import Components.Renderable
 import qualified Data.List as List
+import Entities.Plants
+import GameState
 import EntityComponentSystem
-import StringTable.Atom
 import System.Random
+import StringTable.Atom
+--import Debug.Trace
 
 createBrick :: Float -> Float -> GameState -> GameState
-createBrick x y gameState = gameState4
+createBrick x y gameState = gameState5
     where
     (entity, gameState') = createEntity gameState groundBrick
     (entity', gameState'') = addPosition (x, y) gameState' entity
+    gameState3 = snd $ addRenderable gameState'' entity'
 
-    (roll, gameState3) = generateRandomBetween (0, 100) gameState''
-    gameState4 = if roll > oddsOfTree
-        then gameState3
-        else createTree (x, y) gameState3
-
-createEntity :: GameState -> Kind -> (Entity, GameState)
-createEntity gameState kind = (entity, gameState') 
-    where
-    serial = entitySerial gameState
-    entity = Entity serial kind emptyComponents
-    entities' = Map.insert serial entity $ entities gameState
-    gameState' = gameState {entitySerial = serial + 1, entities = entities'}
+    (roll, gameState4) = generateRandomBetween (0, 100) gameState3
+    gameState5 = if roll > oddsOfTree
+        then gameState4
+        else createTree (x, y) gameState4
 
 createRow :: Float -> GameState -> GameState
 createRow y gameState = List.foldl' (flip (flip createBrick y)) gameState [minimumCoordinate.. maximumCoordinate] 
-
-createTree :: Point -> GameState -> GameState
-createTree point gameState = gameState''
-    where
-    (entity, gameState') = createEntity gameState tree
-    (entity', gameState'') = addPosition point gameState' entity
 
 generateRandomBetween ::(Int, Int) -> GameState -> (Int, GameState)
 generateRandomBetween range gameState = (roll, gameState')
@@ -60,5 +51,5 @@ minimumCoordinate = (-100)
 oddsOfTree :: Int
 oddsOfTree = 20
 
-tree :: Kind
-tree = toAtom "tree"
+renderGround :: Float -> GameState -> Entity -> GameState
+renderGround = basicRender Body "grass"

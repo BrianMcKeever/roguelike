@@ -1,17 +1,30 @@
 module Components.Renderable (
-    renderableComponent
+    addRenderable,
+    basicRender,
+    renderableComponent,
+    RenderData(..),
+    ZIndex(..)
 )
 where
-import EntityComponentSystem
-import Graphics.Gloss.Game
+import Components.Position
+import Components.RenderableBase
 import qualified Data.Map.Lazy as Map
-import StringTable.Atom
+import Data.List.Ordered
+import EntityComponentSystem
+import GameState
+import Graphics.Gloss.Game
 
-renderableComponent :: Component
-renderableComponent = Component 0 $ toAtom "renderable"
+addRenderable :: GameState -> Entity -> (Entity, GameState)
+addRenderable gameState entity = (entity', gameState')
+    where
+    (entity', gameState') = addComponent gameState entity renderableComponent
 
-data RenderData = RenderData ZIndex Picture
-
-type RenderableState = Map.Map Serial RenderData
-
-data ZIndex = Earth | Blood | Feet | Body | Head | Sky deriving (Eq, Ord)
+basicRender :: ZIndex -> String -> Float -> GameState -> Entity -> GameState
+basicRender zindex tileName _ gameState entity = gameState'
+    where
+    tile = tiles gameState Map.! tileName
+    (x, y) = getPosition gameState entity
+    tile' = translate x y tile
+    renderD = RenderData zindex tile'
+    renderData' = insertBag renderD $ toBeRendered gameState
+    gameState' = gameState{toBeRendered = renderData'}
