@@ -1,5 +1,4 @@
 module Entities.Plants (
-    basicRender,
     createTree,
     tree,
     renderTree

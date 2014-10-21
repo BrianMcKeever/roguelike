@@ -45,6 +45,7 @@ scaleFactor = 4.0
 
 tileSheetPositions :: Map.Map String TileSheetPosition
 tileSheetPositions = Map.fromList [
+    ("player", TileSheetPosition "player0" 96 64 16 16),
     ("grass", TileSheetPosition "floor" 128 112 16 16),
     ("tree", TileSheetPosition "tree0" 48 0 16 16)
     ] 
@@ -52,6 +53,7 @@ tileSheetPositions = Map.fromList [
 tileSheetPaths :: Map.Map String String
 tileSheetPaths = Map.fromList [
     ("floor", "Assets/DawnLike_3/Objects/Floor.png"),
+    ("player0", "Assets/DawnLike_3/Characters/Player0.png"),
     ("tree0", "Assets/DawnLike_3/Objects/Tree0.png"),
     ("tree1", "Assets/DawnLike_3/Objects/Tree1.png") 
     ] 

@@ -42,7 +42,7 @@ initialGameState :: GameState
 initialGameState = GameState{
     entitySerial = 0, 
     entities = Map.empty, 
-    randomState = mkStdGen 0, 
+    randomState = mkStdGen 1, 
     positionState = initialPositionState,
     renderFunctions = Map.empty,
     tiles = Map.empty,

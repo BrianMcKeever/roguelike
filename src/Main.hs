@@ -5,6 +5,7 @@ import qualified Data.List as List
 import qualified Data.Map as Map
 import Data.Maybe
 import qualified Data.Set as Set
+import Entities.Player
 import EntityComponentSystem
 import GameState
 import Graphics.Gloss.Data.Picture
@@ -12,7 +13,7 @@ import Graphics.Gloss.Game hiding (play)
 import Graphics.Gloss.Interface.Pure.Game
 import Tiles
 import World
-import Debug.Trace
+--import Debug.Trace
 
 draw :: GameState -> Picture
 draw gameState = pictures pictureList
@@ -26,8 +27,8 @@ handleInput _event gameState = gameState
 main :: IO ()
 main = do
     tiles' <- loadTiles
-    let gameState =trace  "x" $ loadMap initialGameState {tiles = tiles'}
-    play (InWindow windowTitle (650, 650) (50, 50)) white 10 gameState draw handleInput update
+    let gameState = createPlayer (fromIntegral windowWidth/64/2, fromIntegral windowHeight/64/2) $ loadMap initialGameState {tiles = tiles'}
+    play (InWindow windowTitle (windowWidth, windowHeight) (50, 50)) white 10 gameState draw handleInput update
 
 update :: Float -> GameState -> GameState
 update tick = updateGraphics tick . updateGame tick 
@@ -79,3 +80,9 @@ updateGraphics tick gameState = Map.foldl' (updateEntityGraphic tick) gameState 
 
 windowTitle :: String
 windowTitle = "Rogue Bard"
+
+windowWidth :: Int
+windowWidth = 704
+
+windowHeight :: Int
+windowHeight = 704
