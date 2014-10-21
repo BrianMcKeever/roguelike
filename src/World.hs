@@ -53,7 +53,7 @@ oddsOfTree :: Int
 oddsOfTree = 20
 
 renderGround :: Float -> GameState -> Entity -> GameState
-renderGround = basicRender Body "grass"
+renderGround = basicRender Earth "grass"
 
 tileRange :: [Float]
 tileRange = [minimumCoordinate, minimumCoordinate + tileSize..maximumCoordinate]
