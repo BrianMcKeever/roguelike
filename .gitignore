@@ -2,6 +2,7 @@
 rogue.aux
 rogue.hp
 rogue.ps
+rogue.prof
 dist
 *.swp
 cabal.sandbox.config
