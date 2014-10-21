@@ -44,10 +44,10 @@ loadMap :: GameState -> GameState
 loadMap gameState =  List.foldl' (flip createRow) gameState tileRange
 
 maximumCoordinate :: Float
-maximumCoordinate = 100 * tileSize
+maximumCoordinate = 5 * tileSize
 
 minimumCoordinate :: Float
-minimumCoordinate = (-10) * tileSize
+minimumCoordinate = (-5) * tileSize
 
 oddsOfTree :: Int
 oddsOfTree = 20

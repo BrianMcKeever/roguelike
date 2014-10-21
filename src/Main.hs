@@ -27,7 +27,7 @@ main :: IO ()
 main = do
     tiles' <- loadTiles
     let gameState =trace  "x" $ loadMap initialGameState {tiles = tiles'}
-    play (InWindow windowTitle (600, 400) (50, 50)) white 30 gameState draw handleInput update
+    play (InWindow windowTitle (650, 650) (50, 50)) white 10 gameState draw handleInput update
 
 update :: Float -> GameState -> GameState
 update tick = updateGraphics tick . updateGame tick 

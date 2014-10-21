@@ -1,4 +1,7 @@
 .cabal-sandbox
+rogue.aux
+rogue.hp
+rogue.ps
 dist
 *.swp
 cabal.sandbox.config
