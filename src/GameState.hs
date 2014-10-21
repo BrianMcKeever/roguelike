@@ -30,7 +30,7 @@ createEntity gameState kind = (entity, gameState')
     gameState' = gameState {entitySerial = serial + 1, entities = entities'}
 
 data GameState = GameState {
-    entitySerial :: Int, 
+    entitySerial :: Integer, 
     entities :: (Map.Map Serial Entity), 
     positionState :: PositionState, 
     randomState :: StdGen, 

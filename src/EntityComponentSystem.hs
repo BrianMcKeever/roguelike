@@ -33,7 +33,8 @@ type Components = Set.Set Component
 data Entity = Entity Serial Kind Components 
 
 type Kind = Atom
-type Serial = Int
+type Serial = Integer
+
 componentFoldl :: (a -> Component -> a) -> a -> Components -> a
 componentFoldl = Set.foldl'
 

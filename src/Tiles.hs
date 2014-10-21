@@ -1,5 +1,7 @@
-module Tiles
-    (loadTiles)
+module Tiles(
+    loadTiles,
+    scaleFactor
+)
 where
 import Codec.Picture
 import Codec.Picture.Types

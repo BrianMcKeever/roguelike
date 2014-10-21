@@ -13,6 +13,7 @@ import GameState
 import EntityComponentSystem
 import System.Random
 import StringTable.Atom
+import Tiles
 --import Debug.Trace
 
 createBrick :: Float -> Float -> GameState -> GameState
@@ -28,9 +29,9 @@ createBrick x y gameState = gameState5
         else createTree (x, y) gameState4
 
 createRow :: Float -> GameState -> GameState
-createRow y gameState = List.foldl' (flip (flip createBrick y)) gameState [minimumCoordinate.. maximumCoordinate] 
+createRow y gameState = List.foldl' (flip (flip createBrick y)) gameState tileRange
 
-generateRandomBetween ::(Int, Int) -> GameState -> (Int, GameState)
+generateRandomBetween :: (Int, Int) -> GameState -> (Int, GameState)
 generateRandomBetween range gameState = (roll, gameState')
     where
     (roll, randomState') = randomR range $ randomState gameState
@@ -40,16 +41,22 @@ groundBrick :: Kind
 groundBrick = toAtom "groundBrick"
 
 loadMap :: GameState -> GameState
-loadMap gameState =  List.foldl' (flip createRow) gameState [minimumCoordinate.. maximumCoordinate] 
+loadMap gameState =  List.foldl' (flip createRow) gameState tileRange
 
 maximumCoordinate :: Float
-maximumCoordinate = 100
+maximumCoordinate = 100 * tileSize
 
 minimumCoordinate :: Float
-minimumCoordinate = (-100)
+minimumCoordinate = (-10) * tileSize
 
 oddsOfTree :: Int
 oddsOfTree = 20
 
 renderGround :: Float -> GameState -> Entity -> GameState
 renderGround = basicRender Body "grass"
+
+tileRange :: [Float]
+tileRange = [minimumCoordinate, minimumCoordinate + tileSize..maximumCoordinate]
+
+tileSize :: Float
+tileSize = 16 * scaleFactor

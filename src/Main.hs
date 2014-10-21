@@ -12,7 +12,7 @@ import Graphics.Gloss.Game hiding (play)
 import Graphics.Gloss.Interface.Pure.Game
 import Tiles
 import World
---import Debug.Trace
+import Debug.Trace
 
 draw :: GameState -> Picture
 draw gameState = pictures pictureList
@@ -26,7 +26,7 @@ handleInput _event gameState = gameState
 main :: IO ()
 main = do
     tiles' <- loadTiles
-    let gameState = loadMap initialGameState {tiles = tiles'}
+    let gameState =trace  "x" $ loadMap initialGameState {tiles = tiles'}
     play (InWindow windowTitle (600, 400) (50, 50)) white 30 gameState draw handleInput update
 
 update :: Float -> GameState -> GameState
@@ -73,7 +73,7 @@ updateGraphics :: Float -> GameState -> GameState
 -- Tell these entities to prepare their pictures.
 updateGraphics tick gameState = Map.foldl' (updateEntityGraphic tick) gameState entities'
     where
-    box = ((0, 0), (100, 100))
+    box = ((0, 0), (1000, 1000))
     willBeShown entity = hasComponent entity renderableComponent && withinBox gameState box entity
     entities' = Map.filter willBeShown $ entities gameState
 
