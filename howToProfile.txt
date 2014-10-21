@@ -1,2 +1,2 @@
 dist\build\rogue\rogue.exe +RTS -p -hc
-hp2ps.exe rogue.hp
+hp2ps -e8in -c rogue.hp

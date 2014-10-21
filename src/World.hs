@@ -44,7 +44,7 @@ loadMap :: GameState -> GameState
 loadMap gameState =  List.foldl' (flip createRow) gameState tileRange
 
 maximumCoordinate :: Float
-maximumCoordinate = 5 * tileSize
+maximumCoordinate = 100 * tileSize
 
 minimumCoordinate :: Float
 minimumCoordinate = (-5) * tileSize

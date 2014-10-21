@@ -72,7 +72,7 @@ updateGraphics :: Float -> GameState -> GameState
 -- Keep the entities that are within the screen area plus half the width of our
 -- biggest sprite.
 -- Tell these entities to prepare their pictures.
-updateGraphics tick gameState = Map.foldl' (updateEntityGraphic tick) gameState entities'
+updateGraphics tick gameState = Map.foldl' (updateEntityGraphic tick) gameState {toBeRendered = []} entities'
     where
     box = ((0, 0), (1000, 1000))
     willBeShown entity = hasComponent entity renderableComponent && withinBox gameState box entity
