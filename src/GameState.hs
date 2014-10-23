@@ -3,23 +3,27 @@ module GameState (
     createEntity,
     GameState(..),
     initialGameState,
-    updateFunctions
+    removeComponent
 )
 where
-import Components.PositionBase
+import Components.PhysicsBase
 import Components.RenderableBase
+import Components.TransformBase
 import qualified Data.Map.Lazy as Map
 import qualified Data.Set as Set
 import EntityComponentSystem
 import Graphics.Gloss.Game
+import qualified Physics.Hipmunk as H
 import System.Random
 
-addComponent :: GameState -> Entity -> Component -> (Entity, GameState)
-addComponent gameState (Entity serial kind components) component = (entity, gameState')
+addComponent :: Component -> GameState -> Entity -> (Entity, GameState)
+addComponent component gameState (Entity serial kind components) = (entity, gameState')
     where
     entity = Entity serial kind $ Set.insert component components
     entities' = Map.insert serial entity $ entities gameState
     gameState' = gameState{entities = entities'}
+    --addComponent is here because it was causing circular imports in
+    --entitycomponentSystem
   
 createEntity :: GameState -> Kind -> (Entity, GameState)
 createEntity gameState kind = (entity, gameState') 
@@ -32,28 +36,31 @@ createEntity gameState kind = (entity, gameState')
 data GameState = GameState {
     entitySerial :: Integer, 
     entities :: (Map.Map Serial Entity), 
-    positionState :: PositionState, 
+    physicsState :: PhysicsState,
+    transformState :: TransformState, 
     randomState :: StdGen, 
-    renderFunctions :: (Map.Map Serial (Float -> GameState -> Entity -> GameState)),
+    renderFunctions :: (Map.Map Serial (Float -> GameState -> Entity -> IO GameState)),
+    space :: H.Space,
     tiles :: (Map.Map String Picture),
     toBeRendered :: [RenderData]}
 
-initialGameState :: GameState
-initialGameState = GameState{
-    entitySerial = 0, 
-    entities = Map.empty, 
-    randomState = mkStdGen 1, 
-    positionState = initialPositionState,
-    renderFunctions = Map.empty,
-    tiles = Map.empty,
-    toBeRendered = []}
+initialGameState :: IO GameState
+initialGameState = do
+    space' <- H.newSpace
+    return $ GameState{
+        entitySerial = 0, 
+        entities = Map.empty, 
+        physicsState = initialPhysicsState,
+        randomState = mkStdGen 1, 
+        transformState = initialTransformState,
+        renderFunctions = Map.empty,
+        space = space',
+        tiles = Map.empty,
+        toBeRendered = []}
 
-updateFunctions :: Map.Map Component (Float -> GameState -> Entity -> GameState)
-updateFunctions = Map.fromList  [
-    (positionComponent, pass),
-    (renderableComponent, pass)
-    ]
+removeComponent :: Component -> GameState -> Entity -> (Entity, GameState)
+removeComponent component gameState (Entity serial kind components) = (entity', gameState')
     where
-    pass _ gameState _ = gameState
--- I decided to store my update functions in this dictionary instead of each
--- component because storing them in each component would cause circular imports
+    entity' = Entity serial kind $ Set.delete component components
+    entities' = Map.insert serial entity' $ entities gameState
+    gameState' = gameState{entities = entities'}

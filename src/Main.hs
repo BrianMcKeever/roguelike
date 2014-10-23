@@ -1,47 +1,61 @@
-import Components.Position
 import Components.Renderable
 import Components.RenderKindFunctions
+import Components.Transform
+import Control.Monad
 import qualified Data.List as List
 import qualified Data.Map as Map
 import Data.Maybe
 import qualified Data.Set as Set
 import Entities.Player
 import EntityComponentSystem
+import GHC.Float
 import GameState
 import Graphics.Gloss.Data.Picture
 import Graphics.Gloss.Game hiding (play)
-import Graphics.Gloss.Interface.Pure.Game
+import Graphics.Gloss.Interface.IO.Game
+import qualified Physics.Hipmunk as H
 import Tiles
+import UpdateFunctions
 import World
 --import Debug.Trace
 
-draw :: GameState -> Picture
-draw gameState = pictures pictureList
+draw :: GameState -> IO Picture
+draw gameState = return $ pictures pictureList
     where
     pictureOnly (RenderData _ p) = p
     pictureList = map pictureOnly $ toBeRendered gameState
 
-handleInput :: Event -> GameState -> GameState
-handleInput _event gameState = gameState
+handleInput :: Event -> GameState -> IO GameState
+handleInput _event gameState = return gameState
 
 main :: IO ()
 main = do
+    H.initChipmunk
+    gameState <- initialGameState
     tiles' <- loadTiles
-    let gameState = createPlayer (fromIntegral windowWidth/64/2, fromIntegral windowHeight/64/2) $ loadMap initialGameState {tiles = tiles'}
-    play (InWindow windowTitle (windowWidth, windowHeight) (50, 50)) white 10 gameState draw handleInput update
+    gameState' <- loadMap gameState {tiles = tiles'}
+    gameState'' <- createPlayer (H.Vector (fromIntegral windowWidth/64/2) $ fromIntegral windowHeight/64/2) gameState'
+    playIO (InWindow windowTitle (windowWidth, windowHeight) (50, 50)) white 10 gameState'' draw handleInput update
 
-update :: Float -> GameState -> GameState
-update tick = updateGraphics tick . updateGame tick 
+update :: Float -> GameState -> IO GameState
+update tick gameState = do
+    let gameState' = updateGame tick gameState
+    gameState'' <- updateGraphics tick gameState'
+    H.step (space gameState'') $ float2Double tick
+    return gameState''
 
-updateEntityGraphic :: Float -> GameState -> Entity -> GameState
-updateEntityGraphic tick gameState entity@(Entity serial kind _) = renderFunction tick gameState' entity
-    where
-    renderFunctions' = renderFunctions gameState
-    maybeRenderFunction = Map.lookup serial renderFunctions'
-    (renderFunction, gameState') = if isJust maybeRenderFunction
-        then (fromJust maybeRenderFunction, gameState)
-        else let renderFunction' = renderKindFunctions Map.! kind in
-            (renderFunction', gameState{renderFunctions = Map.insert serial renderFunction renderFunctions'})
+updateEntityGraphic :: Float -> GameState -> Entity -> IO GameState
+updateEntityGraphic tick gameState entity@(Entity serial kind _) = do
+    let renderFunctions' = renderFunctions gameState
+    let maybeRenderFunction = Map.lookup serial renderFunctions'
+    if isJust maybeRenderFunction
+        -- if we have a render function call it. Otherwise, load
+        --  a render function of that type and call that.
+        then (fromJust maybeRenderFunction) tick gameState entity
+        else do
+            let renderFunction' = renderKindFunctions Map.! kind
+            let renderFunctions'' = Map.insert serial renderFunction' renderFunctions'
+            renderFunction' tick gameState{renderFunctions = renderFunctions''} entity
             --I'm loading the render function here because doing it in a saner
             --place causes circular imports
 
@@ -67,16 +81,17 @@ updateGame tick gameState = List.foldl' updateEntity gameState $ Map.keys $ enti
     --Passing old copies of components doesn't matter because they store their
     --state in game state.
 
-updateGraphics :: Float -> GameState -> GameState
--- Get entities that are renderable.
--- Keep the entities that are within the screen area plus half the width of our
--- biggest sprite.
--- Tell these entities to prepare their pictures.
-updateGraphics tick gameState = Map.foldl' (updateEntityGraphic tick) gameState {toBeRendered = []} entities'
+updateGraphics :: Float -> GameState -> IO GameState
+updateGraphics tick gameState = do
+    entities' <- filterM willBeShown $ Map.elems $ entities gameState
+    foldM (updateEntityGraphic tick) gameState {toBeRendered = []} entities'
     where
     box = ((0, 0), (1000, 1000))
-    willBeShown entity = hasComponent entity renderableComponent && withinBox gameState box entity
-    entities' = Map.filter willBeShown $ entities gameState
+    -- TODO  make sure this box fits
+    willBeShown entity = do
+        let result = hasComponent entity renderableComponent
+        result2 <- withinBox gameState box entity
+        return $ result && result2
 
 windowTitle :: String
 windowTitle = "Rogue Bard"
