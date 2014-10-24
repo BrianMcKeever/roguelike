@@ -1,8 +1,9 @@
 module Components.Transform (
     addTransform,
     getPosition,
-    Position,
+    getScale,
     positionToPoint,
+    Position,
     removeTransform,
     setPosition,
     transformComponent,
@@ -20,11 +21,12 @@ import Graphics.Gloss.Data.Point
 import Graphics.Gloss.Game
 import qualified Physics.Hipmunk as H
 
-addTransform :: H.Position -> GameState -> Entity -> IO (Entity, GameState)
-addTransform coordinate gameState entity = do
+addTransform :: H.Position -> Float -> Float -> GameState -> Entity -> IO (Entity, GameState)
+addTransform coordinate scaleX scaleY gameState entity = do
     let (entity', gameState') = addComponent transformComponent gameState entity
     gameState'' <- setPosition coordinate entity' gameState'
-    return (entity', gameState'')
+    let gameState3 = setScale scaleX scaleY gameState'' entity'
+    return (entity', gameState3)
 
 getPosition :: GameState -> Entity -> IO H.Position
 getPosition gameState entity@(Entity serial _ _) = if hasComponent entity physicsComponent
@@ -32,6 +34,14 @@ getPosition gameState entity@(Entity serial _ _) = if hasComponent entity physic
     else return $ (transformState gameState) Map.! serial
     where
     (PhysicsData body _) = physicsState gameState Map.! serial
+
+getScale :: GameState -> Entity -> (Float, Float)
+getScale gameState (Entity serial _ _) = (scaleState gameState) Map.! serial
+
+type Position = H.Position
+
+positionToPoint :: H.Position -> Point
+positionToPoint (H.Vector a b) = (double2Float a, double2Float b)
 
 rectangleToCornerPoints :: Rect -> (Point, Point)
 rectangleToCornerPoints ((x, y), (width, height)) = (((x - halfWidth), (y - halfHeight)), ((x + halfWidth), (y + halfHeight)))
@@ -49,7 +59,6 @@ removeTransform gameState entity@(Entity serial _ _) = do
         let transformState' = Map.delete serial $ transformState gameState
         removeComponent transformComponent gameState{transformState = transformState'} entity
     
-    
 setPosition :: H.Position -> Entity -> GameState -> IO GameState
 setPosition coordinate entity@(Entity serial _ _) gameState = do
     -- I am hiding that positions for non-collideables are different than
@@ -64,10 +73,10 @@ setPosition coordinate entity@(Entity serial _ _) gameState = do
     where
     (PhysicsData body _) = physicsState gameState Map.! serial
 
-type Position = H.Position
-
-positionToPoint :: H.Position -> Point
-positionToPoint (H.Vector a b) = (double2Float a, double2Float b)
+setScale :: Float -> Float -> GameState -> Entity -> GameState
+setScale x y gameState (Entity serial _ _) = gameState{scaleState = scaleState'}
+    where
+    scaleState' = Map.insert serial (x, y) $ scaleState gameState
 
 withinBox :: GameState -> Rect -> Entity -> IO Bool
 withinBox gameState box entity = do

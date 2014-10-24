@@ -13,7 +13,7 @@ import StringTable.Atom
 createTree :: Position -> GameState -> IO GameState
 createTree position gameState = do
     let (entity, gameState') = createEntity gameState tree
-    (entity', gameState'') <- addTransform position gameState' entity
+    (entity', gameState'') <- addTransform position 4 4 gameState' entity
     return $ snd $ addRenderable gameState'' entity'
 
 renderTree :: Float -> GameState -> Entity -> IO GameState

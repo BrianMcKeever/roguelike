@@ -1,6 +1,5 @@
 module Tiles(
-    loadTiles,
-    scaleFactor
+    loadTiles
 )
 where
 import Codec.Picture
@@ -32,16 +31,13 @@ loadTile :: Map.Map String (IO DynamicImage) -> String -> TileSheetPosition -> I
 loadTile sheets name (TileSheetPosition sheetName leftOffset topOffset width height) tiles = do
     tiles' <- tiles
     sheet <- Maybe.fromJust $ Map.lookup sheetName sheets
-    return $ Map.insert name (scale scaleFactor scaleFactor $ dynamicToPicture $ crop leftOffset topOffset width height sheet) tiles'
+    return $ Map.insert name (dynamicToPicture $ crop leftOffset topOffset width height sheet) tiles'
 
 loadTiles :: IO (Map.Map String Picture)
 loadTiles = Map.foldWithKey (loadTile loadSheets) (return Map.empty) tileSheetPositions
 
 data TileSheetPosition = TileSheetPosition String    Int          Int      Int    Int
 --                                        sheetName leftOffset  topOffset width height
-
-scaleFactor :: Float
-scaleFactor = 4.0
 
 tileSheetPositions :: Map.Map String TileSheetPosition
 tileSheetPositions = Map.fromList [

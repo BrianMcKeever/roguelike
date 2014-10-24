@@ -40,6 +40,7 @@ data GameState = GameState {
     transformState :: TransformState, 
     randomState :: StdGen, 
     renderFunctions :: (Map.Map Serial (Float -> GameState -> Entity -> IO GameState)),
+    scaleState :: ScaleState,
     space :: H.Space,
     tiles :: (Map.Map String Picture),
     toBeRendered :: [RenderData]}
@@ -52,6 +53,7 @@ initialGameState = do
         entities = Map.empty, 
         physicsState = initialPhysicsState,
         randomState = mkStdGen 1, 
+        scaleState = initialScaleState,
         transformState = initialTransformState,
         renderFunctions = Map.empty,
         space = space',

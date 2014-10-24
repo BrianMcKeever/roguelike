@@ -15,19 +15,21 @@ import EntityComponentSystem
 import qualified Physics.Hipmunk as H
 import System.Random
 import StringTable.Atom
-import Tiles
 --import Debug.Trace
 
 createBrick :: Double -> Double -> GameState -> IO GameState
 createBrick x y gameState = do
     let (entity, gameState') = createEntity gameState groundBrick
-    (entity', gameState'') <- addTransform (H.Vector x y) gameState' entity
+    (entity', gameState'') <- addTransform (H.Vector x y) brickScale brickScale gameState' entity
     let gameState3 = snd $ addRenderable gameState'' entity'
 
     let (roll, gameState4) = generateRandomBetween (0, 100) gameState3
     if roll > oddsOfTree
         then return gameState4
         else createTree (H.Vector x y) gameState4
+
+brickScale :: Float
+brickScale = 4
 
 createRow :: Double -> GameState -> IO GameState
 createRow y gameState = foldM (flip (flip createBrick y)) gameState tileRange
@@ -45,7 +47,7 @@ loadMap :: GameState -> IO GameState
 loadMap gameState = foldM (flip createRow) gameState tileRange
 
 maximumCoordinate :: Double
-maximumCoordinate = 100 * tileSize
+maximumCoordinate = 5 * tileSize
 
 minimumCoordinate :: Double
 minimumCoordinate = (-5) * tileSize
@@ -60,4 +62,4 @@ tileRange :: [Double]
 tileRange = [minimumCoordinate, minimumCoordinate + tileSize..maximumCoordinate]
 
 tileSize :: Double
-tileSize = 16 * float2Double scaleFactor
+tileSize = 16 * float2Double brickScale

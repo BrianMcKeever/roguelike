@@ -13,7 +13,7 @@ import StringTable.Atom
 createPlayer :: Position -> GameState -> IO GameState
 createPlayer position gameState = do
     let (entity, gameState') = createEntity gameState player
-    (entity', gameState'') <- addTransform position gameState' entity
+    (entity', gameState'') <- addTransform position 4 4 gameState' entity
     return $ snd $ addRenderable gameState'' entity'
 
 renderPlayer :: Float -> GameState -> Entity -> IO GameState
