@@ -1,39 +1,44 @@
 module Components.Physics (
     addPhysics,
+    createSquare,
     getBody,
     physicsComponent,
-    physicsState(..)
+    PhysicsState
 )
 where
 import Components.PhysicsBase
 import Components.Transform
 import qualified Data.Map.Lazy as Map
-import Data.List.Ordered
 import EntityComponentSystem
 import GameState
-import Graphics.Gloss.Game
 import qualified Physics.Hipmunk as H
 
 addPhysics :: H.Mass -> H.Moment -> H.ShapeType -> GameState -> Entity -> IO (Entity, GameState)
-addPhysics gameState (Entity serial _ _) = do
+addPhysics mass moment shapeType gameState entity@(Entity serial _ _) = do
+    let space' = space gameState
     body <- H.newBody mass moment
-    H.spaceAdd space body
-    shape <- H.newShape body shapeType (0, 0)
-    H.spaceAdd space shape
+    H.spaceAdd space' body
+    shape <- H.newShape body shapeType $ H.Vector 0 0
+    H.spaceAdd space' shape
     -- I am assuming I will only be using simple shapes, so I've set the
     -- position offset to (0, 0)
 
-    let physicsState = Map.insert serial (PhysicsData body shape) $ physicsState gameState
+    let physicsState' = Map.insert serial (PhysicsData body shape) $ physicsState gameState
     let (entity', gameState') = addComponent physicsComponent gameState entity
-    let gameState'' = gameState'{physicsState = physicsState}
+    let gameState'' = gameState'{physicsState = physicsState'}
     if hasComponent entity transformComponent
-    then do
-        -- if they have it, it's not in collision space, so we re-add it to make
-        -- it collision space.
-        position <- getPosition gameState entity --intentionally using old version of gameState
-        let (entity'', gameState3) = removeTransform gameState'' entity'
-        addTransform gameState3 entity'' position
+    then error "Add physics component before transformationComponent"
     else return (entity', gameState'')
+
+createSquare :: Double -> Double -> H.ShapeType
+createSquare width height = H.Polygon [ne, se, sw, nw]
+    where
+    halfWidth = width/2
+    halfHeight = height/2
+    ne = H.Vector halfWidth halfHeight
+    se = H.Vector halfWidth (-halfHeight)
+    nw = H.Vector (-halfWidth) halfHeight
+    sw = H.Vector (-halfWidth) (-halfHeight)
 
 getBody :: GameState -> Entity -> H.Body
 getBody gameState (Entity serial _ _) = body

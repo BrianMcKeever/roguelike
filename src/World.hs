@@ -20,16 +20,13 @@ import StringTable.Atom
 createBrick :: Double -> Double -> GameState -> IO GameState
 createBrick x y gameState = do
     let (entity, gameState') = createEntity gameState groundBrick
-    (entity', gameState'') <- addTransform (H.Vector x y) brickScale brickScale gameState' entity
+    (entity', gameState'') <- addTransform (H.Vector x y) normalScale normalScale gameState' entity
     let gameState3 = snd $ addRenderable gameState'' entity'
 
     let (roll, gameState4) = generateRandomBetween (0, 100) gameState3
     if roll > oddsOfTree
         then return gameState4
         else createTree (H.Vector x y) gameState4
-
-brickScale :: Float
-brickScale = 4
 
 createRow :: Double -> GameState -> IO GameState
 createRow y gameState = foldM (flip (flip createBrick y)) gameState tileRange
@@ -62,4 +59,4 @@ tileRange :: [Double]
 tileRange = [minimumCoordinate, minimumCoordinate + tileSize..maximumCoordinate]
 
 tileSize :: Double
-tileSize = 16 * float2Double brickScale
+tileSize = 16 * float2Double normalScale

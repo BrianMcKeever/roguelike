@@ -1,6 +1,7 @@
 module Components.Renderable (
     addRenderable,
     basicRender,
+    normalScale,
     renderableComponent,
     RenderData(..),
     ZIndex(..)
@@ -26,3 +27,6 @@ basicRender zindex tileName _ gameState entity = do
     let renderD = RenderData zindex tile'
     let renderData' = insertBag renderD $ toBeRendered gameState
     return gameState{toBeRendered = renderData'}
+
+normalScale :: Float
+normalScale = 4
