@@ -2,12 +2,14 @@ module GameState (
     addComponent,
     createEntity,
     GameState(..),
+    getEntity,
     initialGameState,
     removeComponent
 )
 where
 import Components.PhysicsBase
 import Components.RenderableBase
+import Components.SimpleMovementBase
 import Components.TransformBase
 import qualified Data.Map.Lazy as Map
 import qualified Data.Set as Set
@@ -33,13 +35,18 @@ createEntity gameState kind = (entity, gameState')
     entities' = Map.insert serial entity $ entities gameState
     gameState' = gameState {entitySerial = serial + 1, entities = entities'}
 
+getEntity :: Serial -> GameState -> Entity
+getEntity serial gameState = entities gameState Map.! serial
+
 data GameState = GameState {
     entitySerial :: Integer, 
     entities :: (Map.Map Serial Entity), 
     physicsState :: PhysicsState,
+    playerSerial :: Serial,
     transformState :: TransformState, 
     randomState :: StdGen, 
     renderFunctions :: (Map.Map Serial (Float -> GameState -> Entity -> IO GameState)),
+    simpleMovementState :: SimpleMovementState,
     scaleState :: ScaleState,
     space :: H.Space,
     tiles :: (Map.Map String Picture),
@@ -52,8 +59,10 @@ initialGameState = do
         entitySerial = 0, 
         entities = Map.empty, 
         physicsState = initialPhysicsState,
+        playerSerial = (-666),
         randomState = mkStdGen 1, 
         scaleState = initialScaleState,
+        simpleMovementState = initialSimpleMovementState,
         transformState = initialTransformState,
         renderFunctions = Map.empty,
         space = space',

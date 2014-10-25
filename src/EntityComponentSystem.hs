@@ -1,15 +1,19 @@
 module EntityComponentSystem (
     Component(..), 
     componentFoldl,
+    componentFoldM,
     componentsToList,
     Components, 
     emptyComponents,
     Entity(..),
+    getComponents,
+    getSerial,
     hasComponent,
     Kind,
     Serial
 )
 where
+import Control.Monad
 import qualified Data.Set as Set
 import StringTable.Atom
 
@@ -32,11 +36,20 @@ type Components = Set.Set Component
 
 data Entity = Entity Serial Kind Components 
 
+getComponents :: Entity -> Components
+getComponents (Entity _ _ components) = components
+
+getSerial :: Entity -> Serial
+getSerial (Entity serial _ _) = serial
+
 type Kind = Atom
 type Serial = Integer
 
 componentFoldl :: (a -> Component -> a) -> a -> Components -> a
 componentFoldl = Set.foldl'
+
+componentFoldM :: Monad m => (a -> Component -> m a) -> a -> Components -> m a
+componentFoldM f initial components = foldM f initial $ Set.toList components
 
 componentsToList :: Components -> [Component]
 componentsToList = Set.toAscList

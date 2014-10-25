@@ -1,8 +1,8 @@
 import Components.Renderable
 import Components.RenderKindFunctions
+import Components.SimpleMovement
 import Components.Transform
 import Control.Monad
-import qualified Data.List as List
 import qualified Data.Map as Map
 import Data.Maybe
 import qualified Data.Set as Set
@@ -17,7 +17,6 @@ import qualified Physics.Hipmunk as H
 import Tiles
 import UpdateFunctions
 import World
---import Debug.Trace
 
 draw :: GameState -> IO Picture
 draw gameState = return $ pictures pictureList
@@ -26,7 +25,9 @@ draw gameState = return $ pictures pictureList
     pictureList = map pictureOnly $ toBeRendered gameState
 
 handleInput :: Event -> GameState -> IO GameState
-handleInput _event gameState = return gameState
+handleInput (EventKey (MouseButton RightButton) Up _ (x, y)) gameState = do
+    return $ setDestination (Location $ H.Vector (float2Double x) $ float2Double y) gameState $ getPlayer gameState
+handleInput _ gameState = return gameState
 
 main :: IO ()
 main = do
@@ -34,12 +35,12 @@ main = do
     gameState <- initialGameState
     tiles' <- loadTiles
     gameState' <- loadMap gameState {tiles = tiles'}
-    gameState'' <- createPlayer (H.Vector (fromIntegral windowWidth/64/2) $ fromIntegral windowHeight/64/2) gameState'
+    gameState'' <- createPlayer (H.Vector 0 0) gameState'
     playIO (InWindow windowTitle (windowWidth, windowHeight) (50, 50)) white 10 gameState'' draw handleInput update
 
 update :: Float -> GameState -> IO GameState
 update tick gameState = do
-    let gameState' = updateGame tick gameState
+    gameState' <- updateGame tick gameState
     gameState'' <- updateGraphics tick gameState'
     H.step (space gameState'') $ float2Double tick
     return gameState''
@@ -59,25 +60,32 @@ updateEntityGraphic tick gameState entity@(Entity serial kind _) = do
             --I'm loading the render function here because doing it in a saner
             --place causes circular imports
 
-updateGame :: Float -> GameState -> GameState
-updateGame tick gameState = List.foldl' updateEntity gameState $ Map.keys $ entities gameState 
+updateGame :: Float -> GameState -> IO GameState
+updateGame tick gameState = foldM updateEntity gameState $ Map.keys $ entities gameState 
     where
-    ifEntity gameState' serial f = maybe gameState' f $ Map.lookup serial $ entities gameState'
-
-    updateEntity :: GameState -> Serial -> GameState
-    updateEntity gameState' serial = ifEntity gameState' serial f
-        where
-        f (Entity _ _ components) = componentFoldl (updateComponent serial) gameState' components
+    updateEntity :: GameState -> Serial -> IO GameState
+    updateEntity gameState' serial = do
+        let maybeEntity = Map.lookup serial $ entities gameState'
+        if isNothing maybeEntity
+            then return gameState'
+            else do
+                let entity = fromJust maybeEntity
+                componentFoldM (updateComponent serial) gameState' $ getComponents entity
     -- I'm passing serial numbers instead of entity instances because
     -- passing old copies of possibly updated entities would cause
     -- problems.    
 
-    updateComponent :: Serial -> GameState -> Component -> GameState
-    updateComponent serial gameState' component = ifEntity gameState' serial f
-        where
-        f entity@(Entity _ _ components) = if Set.notMember component components
-            then gameState' 
-            else (updateFunctions Map.! component) tick gameState' entity
+    updateComponent :: Serial -> GameState -> Component -> IO GameState
+    updateComponent serial gameState' component = do
+        let maybeEntity = Map.lookup serial $ entities gameState'
+        if isNothing maybeEntity
+            then return gameState'
+            else do
+                let entity = fromJust maybeEntity
+                if Set.notMember component $ getComponents entity
+                then return gameState'
+                else (updateFunctions Map.! component) tick gameState' entity
+
     --Passing old copies of components doesn't matter because they store their
     --state in game state.
 
