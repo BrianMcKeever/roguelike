@@ -18,14 +18,15 @@ import Graphics.Gloss.Game
 import qualified Physics.Hipmunk as H
 import System.Random
 
+--Only gameState and initialCameState deserve to be here. Everything else is here because they were causing circular imports in
+--entitycomponentSystem
+
 addComponent :: Component -> GameState -> Entity -> (Entity, GameState)
 addComponent component gameState (Entity serial kind components) = (entity, gameState')
     where
     entity = Entity serial kind $ Set.insert component components
     entities' = Map.insert serial entity $ entities gameState
     gameState' = gameState{entities = entities'}
-    --addComponent is here because it was causing circular imports in
-    --entitycomponentSystem
   
 createEntity :: GameState -> Kind -> (Entity, GameState)
 createEntity gameState kind = (entity, gameState') 
@@ -40,26 +41,26 @@ getEntity serial gameState = entities gameState Map.! serial
 
 data GameState = GameState {
     entitySerial :: Integer, 
-    entities :: (Map.Map Serial Entity), 
+    entities :: Map.Map Serial Entity, 
     physicsState :: PhysicsState,
     playerSerial :: Serial,
     transformState :: TransformState, 
     randomState :: StdGen, 
-    renderFunctions :: (Map.Map Serial (Float -> GameState -> Entity -> IO GameState)),
+    renderFunctions :: Map.Map Serial (Float -> GameState -> Entity -> IO GameState),
     simpleMovementState :: SimpleMovementState,
     scaleState :: ScaleState,
     space :: H.Space,
-    tiles :: (Map.Map String Picture),
+    tiles :: Map.Map String Picture,
     toBeRendered :: [RenderData]}
 
 initialGameState :: IO GameState
 initialGameState = do
     space' <- H.newSpace
-    return $ GameState{
+    return GameState{
         entitySerial = 0, 
         entities = Map.empty, 
         physicsState = initialPhysicsState,
-        playerSerial = (-666),
+        playerSerial = -666,
         randomState = mkStdGen 1, 
         scaleState = initialScaleState,
         simpleMovementState = initialSimpleMovementState,

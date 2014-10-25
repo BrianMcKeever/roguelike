@@ -31,12 +31,12 @@ addTransform coordinate scaleX scaleY gameState entity = do
 getPosition :: GameState -> Entity -> IO H.Position
 getPosition gameState entity@(Entity serial _ _) = if hasComponent entity physicsComponent
     then get $ H.position body
-    else return $ (transformState gameState) Map.! serial
+    else return $ transformState gameState Map.! serial
     where
     (PhysicsData body _) = physicsState gameState Map.! serial
 
 getScale :: GameState -> Entity -> (Float, Float)
-getScale gameState (Entity serial _ _) = (scaleState gameState) Map.! serial
+getScale gameState (Entity serial _ _) = scaleState gameState Map.! serial
 
 type Position = H.Position
 
@@ -44,13 +44,13 @@ positionToPoint :: H.Position -> Point
 positionToPoint (H.Vector a b) = (double2Float a, double2Float b)
 
 rectangleToCornerPoints :: Rect -> (Point, Point)
-rectangleToCornerPoints ((x, y), (width, height)) = (((x - halfWidth), (y - halfHeight)), ((x + halfWidth), (y + halfHeight)))
+rectangleToCornerPoints ((x, y), (width, height)) = ((x - halfWidth, y - halfHeight), (x + halfWidth, y + halfHeight))
     where
     halfWidth = width/2
     halfHeight = height/2
 
 removeTransform :: GameState -> Entity -> IO (Entity, GameState)
-removeTransform gameState entity@(Entity serial _ _) = do
+removeTransform gameState entity@(Entity serial _ _) =
     return $ if hasComponent entity physicsComponent
     then error  "undefined removeTransform execution path"
     -- I'm not sure what this would involve. Sould I remove the physics
@@ -60,7 +60,7 @@ removeTransform gameState entity@(Entity serial _ _) = do
         removeComponent transformComponent gameState{transformState = transformState'} entity
     
 setPosition :: H.Position -> Entity -> GameState -> IO GameState
-setPosition coordinate entity@(Entity serial _ _) gameState = do
+setPosition coordinate entity@(Entity serial _ _) gameState =
     -- I am hiding that positions for non-collideables are different than
     -- positions for collideables
     if hasComponent entity physicsComponent

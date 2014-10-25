@@ -65,6 +65,6 @@ updateSimpleMovement tick gameState entity = do
             --velocity <- getVelocity gameState entity
             let speed' = distance' * deceleration
             let speed'' = min speed' maxSpeed 
-            let velocity' = H.scale (position - goal) $ (float2Double tick)*(-speed'')/distance'
+            let velocity' = H.scale (position - goal) $ float2Double tick *(-speed'')/distance'
             setVelocity velocity' gameState entity
             return gameState

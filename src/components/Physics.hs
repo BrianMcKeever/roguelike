@@ -48,7 +48,7 @@ getBody gameState (Entity serial _ _) = body
     where
     (PhysicsData body _) = physicsState gameState Map.! serial
 
-getVelocity :: GameState -> Entity -> IO (H.Velocity)
+getVelocity :: GameState -> Entity -> IO H.Velocity
 getVelocity gameState entity = do
     let body = getBody gameState entity
     get $ H.velocity body

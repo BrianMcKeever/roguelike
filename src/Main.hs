@@ -25,7 +25,7 @@ draw gameState = return $ pictures pictureList
     pictureList = map pictureOnly $ toBeRendered gameState
 
 handleInput :: Event -> GameState -> IO GameState
-handleInput (EventKey (MouseButton RightButton) Up _ (x, y)) gameState = do
+handleInput (EventKey (MouseButton RightButton) Up _ (x, y)) gameState = 
     return $ setDestination (Location $ H.Vector (float2Double x) $ float2Double y) gameState $ getPlayer gameState
 handleInput _ gameState = return gameState
 
@@ -52,7 +52,7 @@ updateEntityGraphic tick gameState entity@(Entity serial kind _) = do
     if isJust maybeRenderFunction
         -- if we have a render function call it. Otherwise, load
         --  a render function of that type and call that.
-        then (fromJust maybeRenderFunction) tick gameState entity
+        then fromJust maybeRenderFunction tick gameState entity
         else do
             let renderFunction' = renderKindFunctions Map.! kind
             let renderFunctions'' = Map.insert serial renderFunction' renderFunctions'

@@ -29,7 +29,7 @@ createBrick x y gameState = do
         else createTree (H.Vector x y) gameState4
 
 createRow :: Double -> GameState -> IO GameState
-createRow y gameState = foldM (flip (flip createBrick y)) gameState tileRange
+createRow y gameState = foldM (flip (`createBrick` y)) gameState tileRange
 
 generateRandomBetween :: (Int, Int) -> GameState -> (Int, GameState)
 generateRandomBetween range gameState = (roll, gameState')
