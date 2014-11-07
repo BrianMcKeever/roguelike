@@ -8,40 +8,50 @@ where
 import Components.Transform
 import Components.Renderable
 import Control.Monad
+import Control.Monad.State.Lazy
 import Entities.Plants
 import GameState
 import GHC.Float
 import EntityComponentSystem
 import qualified Physics.Hipmunk as H
-import System.Random
 import StringTable.Atom
+import System.Random
 --import Debug.Trace
 
-createBrick :: Double -> Double -> GameState -> IO GameState
-createBrick x y gameState = do
-    let (entity, gameState') = createEntity gameState groundBrick
-    (entity', gameState'') <- addTransform (H.Vector x y) normalScale normalScale gameState' entity
-    let gameState3 = snd $ addRenderable gameState'' entity'
+createBrick :: Double -> Double -> GameState ()
+createBrick x y = do
+    entity <- createEntity groundBrick
+    entity2 <- addTransform (H.Vector x y) normalScale normalScale entity
+    addRenderable entity2
 
-    let (roll, gameState4) = generateRandomBetween (0, 100) gameState3
+    --Todo  this doesn't belong here
+    roll <- generateRandomBetween (0, 100)
     if roll > oddsOfTree
-        then return gameState4
-        else createTree (H.Vector x y) gameState4
+        then return ()
+        else do
+            createTree (H.Vector x y)
+            return ()
 
-createRow :: Double -> GameState -> IO GameState
-createRow y gameState = foldM (flip (`createBrick` y)) gameState tileRange
-
-generateRandomBetween :: (Int, Int) -> GameState -> (Int, GameState)
-generateRandomBetween range gameState = (roll, gameState')
+createRow :: GameData -> Double -> IO GameData
+createRow gameData y = foldM f gameData tileRange
     where
-    (roll, randomState') = randomR range $ randomState gameState
-    gameState' = gameState{randomState = randomState'}
+    f gameData' x = execStateT (createBrick x y) gameData'
+
+generateRandomBetween :: (Int, Int) -> GameState Int
+generateRandomBetween range = do
+    gameData <- get
+    let (roll, randomState') = randomR range $ randomState gameData
+    put gameData{randomState = randomState'}
+    return roll
 
 groundBrick :: Kind
 groundBrick = toAtom "groundBrick"
 
-loadMap :: GameState -> IO GameState
-loadMap gameState = foldM (flip createRow) gameState tileRange
+loadMap :: GameState ()
+loadMap = do
+    gameData <- get
+    gameData' <- liftIO $ foldM createRow gameData tileRange
+    put gameData'
 
 maximumCoordinate :: Double
 maximumCoordinate = 5 * tileSize
@@ -52,7 +62,7 @@ minimumCoordinate = (-5) * tileSize
 oddsOfTree :: Int
 oddsOfTree = 20
 
-renderGround :: Float -> GameState -> Entity -> IO GameState
+renderGround :: Float -> Entity -> GameState ()
 renderGround = basicRender Earth "grass"
 
 tileRange :: [Double]

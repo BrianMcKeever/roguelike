@@ -9,7 +9,7 @@ import EntityComponentSystem
 import GameState
 import World
 
-renderKindFunctions :: Map.Map Kind (Float -> GameState -> Entity -> IO GameState)
+renderKindFunctions :: Map.Map Kind (Float -> Entity -> GameState ())
 renderKindFunctions = Map.fromList [
     (tree, renderTree),
     (groundBrick, renderGround),

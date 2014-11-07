@@ -10,7 +10,7 @@ import qualified Data.Map.Lazy as Map
 import EntityComponentSystem
 import GameState
 
-updateFunctions :: Map.Map Component (Float -> GameState -> Entity -> IO GameState)
+updateFunctions :: Map.Map Component (Float -> Entity -> GameState ())
 updateFunctions = Map.fromList  [
     (physicsComponent, pass),
     (renderableComponent, pass),
@@ -18,6 +18,6 @@ updateFunctions = Map.fromList  [
     (transformComponent, pass)
     ]
     where
-    pass _ gameState _ = return gameState
+    pass _ _ = return ()
 -- I decided to store my update functions in this dictionary instead of each
 -- component because storing them in each component would cause circular imports

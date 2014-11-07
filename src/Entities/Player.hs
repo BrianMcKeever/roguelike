@@ -9,25 +9,28 @@ import Components.Physics
 import Components.Renderable
 import Components.SimpleMovement
 import Components.Transform
+import Control.Monad.State.Lazy
 import GameState
 import GHC.Float
 import EntityComponentSystem
 import StringTable.Atom
 
-createPlayer :: Position -> GameState -> IO GameState
-createPlayer position gameState = do
-    let (entity, gameState') = createEntity gameState player
+createPlayer :: Position -> GameState Entity
+createPlayer position = do
+    entity <- createEntity player
     let square = createSquare (12 * float2Double normalScale) (16 * float2Double normalScale)
-    (entity', gameState'') <- addPhysics 1 1 square gameState' entity
-    (entity'', gameState3) <- addTransform position 4 4 gameState'' entity'
-    let (entity3, gameState4) = addSimpleMovement gameState3 entity''
-    let gameState5 = gameState4{playerSerial = getSerial entity3}
-    return $ snd $ addRenderable gameState5 entity3
+    entity2 <- addPhysics 1 1 square entity
+    entity3 <- addTransform position 4 4 entity2
+    entity4 <- addSimpleMovement entity3
+    gameData <- get
+    put gameData{playerSerial = getSerial entity4}
+    entity5 <- addRenderable entity4
+    return entity5
 
-getPlayer :: GameState -> Entity
-getPlayer gameState = getEntity (playerSerial gameState) gameState
+getPlayer :: GameData -> Entity
+getPlayer gameData = getEntity (playerSerial gameData) gameData
 
-renderPlayer :: Float -> GameState -> Entity -> IO GameState
+renderPlayer :: Float -> Entity -> GameState ()
 renderPlayer = basicRender Body "player"
 
 player :: Kind

@@ -12,15 +12,16 @@ import GHC.Float
 import EntityComponentSystem
 import StringTable.Atom
 
-createTree :: Position -> GameState -> IO GameState
-createTree position gameState = do
-    let (entity, gameState') = createEntity gameState tree
+createTree :: Position -> GameState Entity
+createTree position = do
+    entity <- createEntity tree
     let square = createSquare (15 * float2Double normalScale) (15 * float2Double normalScale)
-    (entity', gameState'') <- addPhysics 1 1 square gameState' entity
-    (entity'', gameState3) <- addTransform position 4 4 gameState'' entity'
-    return $ snd $ addRenderable gameState3 entity''
+    entity2 <- addPhysics 1 1 square entity
+    entity3 <- addTransform position 4 4 entity2
+    entity4 <- addRenderable entity3
+    return entity4
 
-renderTree :: Float -> GameState -> Entity -> IO GameState
+renderTree :: Float -> Entity -> GameState ()
 renderTree = basicRender Body "tree"
 
 tree :: Kind
