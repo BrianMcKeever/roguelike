@@ -18,7 +18,7 @@ createTree position = do
     let square = createSquare (15 * float2Double normalScale) (15 * float2Double normalScale)
     entity2 <- addPhysics 1 1 square entity
     entity3 <- addTransform position 4 4 entity2
-    entity4 <- addRenderable entity3
+    entity4 <- addRenderable entity3 renderTree
     return entity4
 
 renderTree :: Float -> Entity -> GameState ()

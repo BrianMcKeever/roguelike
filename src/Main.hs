@@ -1,5 +1,4 @@
 import Components.Renderable
-import Components.RenderKindFunctions
 import Components.SimpleMovement
 import Components.Transform
 import Control.Monad
@@ -20,10 +19,10 @@ import UpdateFunctions
 import World
 
 draw :: GameData -> IO Picture
-draw gameState = return $ pictures pictureList
+draw gameData = return $ pictures pictureList
     where
     pictureOnly (RenderData _ p) = p
-    pictureList = map pictureOnly $ toBeRendered gameState
+    pictureList = map pictureOnly $ toBeRendered gameData
 
 handleInput :: Event -> GameData -> IO GameData
 handleInput (EventKey (MouseButton RightButton) Up _ (x, y)) gameData = 
@@ -47,21 +46,11 @@ update tick gameData = do
     return gameData''
 
 updateEntityGraphic :: Float -> Entity -> GameState ()
-updateEntityGraphic tick entity@(Entity serial kind _) = do
+updateEntityGraphic tick entity@(Entity serial _ _) = do
     gameData <- get
     let renderFunctions' = renderFunctions gameData
-    let maybeRenderFunction = Map.lookup serial renderFunctions'
-    if isJust maybeRenderFunction
-        -- if we have a render function call it. Otherwise, load
-        --  a render function of that type and call that.
-        then fromJust maybeRenderFunction tick entity
-        else do
-            let renderFunction' = renderKindFunctions Map.! kind
-            let renderFunctions'' = Map.insert serial renderFunction' renderFunctions'
-            put gameData{renderFunctions = renderFunctions''}
-            renderFunction' tick entity
-            --I'm loading the render function here because doing it in a saner
-            --place causes circular imports
+    let renderFunction = renderFunctions' Map.! serial
+    renderFunction tick entity
 
 updateGame :: Float -> GameState ()
 updateGame tick = do

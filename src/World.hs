@@ -22,7 +22,7 @@ createBrick :: Double -> Double -> GameState ()
 createBrick x y = do
     entity <- createEntity groundBrick
     entity2 <- addTransform (H.Vector x y) normalScale normalScale entity
-    addRenderable entity2
+    addRenderable entity2 renderGround
 
     --Todo  this doesn't belong here
     roll <- generateRandomBetween (0, 100)

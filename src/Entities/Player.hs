@@ -24,7 +24,7 @@ createPlayer position = do
     entity4 <- addSimpleMovement entity3
     gameData <- get
     put gameData{playerSerial = getSerial entity4}
-    entity5 <- addRenderable entity4
+    entity5 <- addRenderable entity4 renderPlayer
     return entity5
 
 getPlayer :: GameData -> Entity

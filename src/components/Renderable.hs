@@ -17,8 +17,13 @@ import EntityComponentSystem
 import GameState
 import Graphics.Gloss.Game
 
-addRenderable :: Entity -> GameState Entity
-addRenderable = addComponent renderableComponent
+addRenderable :: Entity -> (Float -> Entity -> GameState ()) -> GameState Entity
+addRenderable entity@(Entity serial _ _) f = do
+    addComponent renderableComponent entity
+    gameData <- get
+    let renderFunctions' = Map.insert serial f $ renderFunctions gameData
+    put gameData{renderFunctions = renderFunctions'}
+    return entity
 
 basicRender :: ZIndex -> String -> Float -> Entity -> GameState ()
 basicRender zindex tileName _ entity = do
