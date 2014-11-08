@@ -55,17 +55,16 @@ updateEntityGraphic tick entity@(Entity serial _ _) = do
 updateGame :: Float -> GameState ()
 updateGame tick = do
     gameData <- get
-    result <- liftIO $ foldM updateEntity gameData $ Map.keys $ entities gameData 
-    put result
+    foldState updateEntity $ Map.keys $ entities gameData 
     where
-    updateEntity :: GameData -> Serial -> IO GameData
-    updateEntity gameData' serial = do
+    updateEntity :: Serial -> GameState ()
+    updateEntity serial = do
+        gameData' <- get
         let maybeEntity = Map.lookup serial $ entities gameData'
-        if isNothing maybeEntity
-            then return gameData'
-            else do
-                let entity = fromJust maybeEntity
-                componentFoldM (updateComponent serial) gameData' $ getComponents entity
+        unless (isNothing maybeEntity) $ do
+            let entity = fromJust maybeEntity
+            liftIO $ componentFoldM (updateComponent serial) gameData' $ getComponents entity
+            return ()
     -- I'm passing serial numbers instead of entity instances because
     -- passing old copies of possibly updated entities would cause
     -- problems.    
@@ -88,8 +87,8 @@ updateGraphics :: Float -> GameState ()
 updateGraphics tick = do
     gameData <- get
     entities' <- liftIO $ filterM (willBeShown gameData) $ Map.elems $ entities gameData
-    result <- liftIO $ foldM (\ gameData' entity -> execStateT (updateEntityGraphic tick entity) gameData') (gameData {toBeRendered = []}) entities'
-    put result
+    put gameData{toBeRendered = []}
+    foldState (updateEntityGraphic tick) entities'
     where
     box = ((0, 0), (1000, 1000))
     -- TODO  make sure this box fits

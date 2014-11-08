@@ -1,6 +1,7 @@
 module GameState (
     addComponent,
     createEntity,
+    foldState,
     GameData(..),
     GameState,
     getEntity,
@@ -39,6 +40,15 @@ createEntity kind = do
     let entities' = Map.insert serial entity $ entities gameData
     put gameData {entities = entities'}
     return entity
+
+foldState :: (a -> GameState b) -> [a] -> GameState ()
+foldState f list = do
+    gameData <- get
+    result <- liftIO $ foldM g gameData list
+    put result
+    return ()
+    where
+    g gameData' a = execStateT (f a) gameData'
 
 getNextSerial :: GameState Integer
 getNextSerial = do

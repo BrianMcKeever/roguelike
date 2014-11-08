@@ -7,7 +7,6 @@ module World (
 where
 import Components.Transform
 import Components.Renderable
-import Control.Monad
 import Control.Monad.State.Lazy
 import Entities.Plants
 import GameState
@@ -16,7 +15,6 @@ import EntityComponentSystem
 import qualified Physics.Hipmunk as H
 import StringTable.Atom
 import System.Random
---import Debug.Trace
 
 createBrick :: Double -> Double -> GameState ()
 createBrick x y = do
@@ -32,10 +30,8 @@ createBrick x y = do
             createTree (H.Vector x y)
             return ()
 
-createRow :: GameData -> Double -> IO GameData
-createRow gameData y = foldM f gameData tileRange
-    where
-    f gameData' x = execStateT (createBrick x y) gameData'
+createRow :: Double -> GameState ()
+createRow y = foldState (flip createBrick y) tileRange
 
 generateRandomBetween :: (Int, Int) -> GameState Int
 generateRandomBetween range = do
@@ -48,10 +44,7 @@ groundBrick :: Kind
 groundBrick = toAtom "groundBrick"
 
 loadMap :: GameState ()
-loadMap = do
-    gameData <- get
-    gameData' <- liftIO $ foldM createRow gameData tileRange
-    put gameData'
+loadMap = foldState createRow tileRange
 
 maximumCoordinate :: Double
 maximumCoordinate = 5 * tileSize

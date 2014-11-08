@@ -32,6 +32,7 @@ basicRender zindex tileName _ entity = do
     (x, y) <- positionToPoint <$> getPosition entity
     let (scaleX, scaleY) = getScale gameData entity
     let tile' = translate x y $ scale scaleX scaleY tile
+    --TODO  scaling all of the tiles every frame is probably bad
     let renderD = RenderData zindex tile'
     let renderData' = insertBag renderD $ toBeRendered gameData
     put gameData{toBeRendered = renderData'}
