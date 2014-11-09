@@ -1,8 +1,8 @@
 module Components.Renderable (
     addRenderable,
     basicRender,
+    hasRenderable,
     normalScale,
-    renderableComponent,
     RenderData(..),
     ZIndex(..)
 )
@@ -18,10 +18,9 @@ import GameState
 import Graphics.Gloss.Game
 
 addRenderable :: Entity -> (Float -> Entity -> GameState ()) -> GameState Entity
-addRenderable entity@(Entity serial _ _) f = do
-    addComponent renderableComponent entity
+addRenderable entity f = do
     gameData <- get
-    let renderFunctions' = Map.insert serial f $ renderFunctions gameData
+    let renderFunctions' = Map.insert entity f $ renderFunctions gameData
     put gameData{renderFunctions = renderFunctions'}
     return entity
 
@@ -36,6 +35,9 @@ basicRender zindex tileName _ entity = do
     let renderD = RenderData zindex tile'
     let renderData' = insertBag renderD $ toBeRendered gameData
     put gameData{toBeRendered = renderData'}
+
+hasRenderable :: Entity -> GameData -> Bool
+hasRenderable entity gameData = Map.member entity $ renderFunctions gameData
 
 normalScale :: Float
 normalScale = 4

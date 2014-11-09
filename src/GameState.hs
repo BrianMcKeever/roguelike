@@ -4,9 +4,8 @@ module GameState (
     foldState,
     GameData(..),
     GameState,
-    getEntity,
-    initialGameData,
-    removeComponent
+    hasComponent,
+    initialGameData
 )
 where
 import Components.PhysicsBase
@@ -24,20 +23,17 @@ import System.Random
 --Only gameState, gameData, and initialCameData deserve to be here. Everything else is here because they were causing circular imports in
 --entitycomponentSystem
 
-addComponent :: Component -> Entity -> GameState Entity
-addComponent component (Entity serial kind components) = do
-    let entity = Entity serial kind $ Set.insert component components
+addComponent :: Component -> Entity -> GameState ()
+addComponent component entity = do
     gameData <- get
-    let entities' = Map.insert serial entity $ entities gameData
-    put gameData{entities = entities'}
-    return entity
+    let components' = Map.insertWith Set.union entity (Set.singleton component) $ components gameData
+    put gameData{components = components'}
   
-createEntity :: Kind -> GameState Entity
-createEntity kind = do
-    serial <- getNextSerial
-    let entity = Entity serial kind emptyComponents
+createEntity :: GameState Entity
+createEntity = do
+    entity <- getNextSerial
     gameData <- get
-    let entities' = Map.insert serial entity $ entities gameData
+    let entities' = Set.insert entity $ entities gameData
     put gameData {entities = entities'}
     return entity
 
@@ -57,22 +53,28 @@ getNextSerial = do
     put gameData {entitySerial = serial + 1}
     return serial
 
-getEntity :: Serial -> GameData -> Entity
-getEntity serial gameData = entities gameData Map.! serial
+hasComponent :: Entity -> GameData -> Component -> Bool
+hasComponent entity gameData component = result
+    where
+    components' = components gameData
+    maybeComponents = Map.lookup entity components'
+    result = maybe False (Set.member component) maybeComponents
 
 data GameData = GameData {
+    components :: ComponentData,
     entitySerial :: Integer, 
-    entities :: Map.Map Serial Entity, 
+    entities :: Set.Set Entity, 
     physicsState :: PhysicsState,
-    playerSerial :: Serial,
-    transformState :: TransformState, 
+    player :: Entity,
     randomState :: StdGen, 
-    renderFunctions :: Map.Map Serial (Float -> Entity -> GameState ()),
+    renderFunctions :: Map.Map Entity (Float -> Entity -> GameState ()),
     simpleMovementState :: SimpleMovementState,
     scaleState :: ScaleState,
     space :: H.Space,
     tiles :: Map.Map String Picture,
-    toBeRendered :: [RenderData]}
+    toBeRendered :: [RenderData],
+    transformComponents :: TransformComponents,
+    transformState :: TransformState}
 
 type GameState = StateT GameData IO
 
@@ -80,10 +82,12 @@ initialGameData :: IO GameData
 initialGameData = do
     space' <- liftIO H.newSpace
     return GameData{
+        components = initialComponentData,
         entitySerial = 0, 
-        entities = Map.empty, 
+        entities = Set.empty, 
+        transformComponents = initialTransformComponents,
         physicsState = initialPhysicsState,
-        playerSerial = -666,
+        player = -666,
         randomState = mkStdGen 1, 
         scaleState = initialScaleState,
         simpleMovementState = initialSimpleMovementState,
@@ -92,11 +96,3 @@ initialGameData = do
         space = space',
         tiles = Map.empty,
         toBeRendered = []}
-
-removeComponent :: Component -> Entity -> GameState Entity
-removeComponent component (Entity serial kind components) = do
-    let entity = Entity serial kind $ Set.delete component components
-    gameData <- get
-    let entities' = Map.insert serial entity $ entities gameData
-    put gameData{entities = entities'}
-    return entity

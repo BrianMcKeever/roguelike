@@ -1,15 +1,16 @@
 module Components.TransformBase (
     initialScaleState,
+    initialTransformComponents,
     initialTransformState,
     ScaleState,
-    transformComponent,
+    TransformComponents,
     TransformState
 )
 where
 import EntityComponentSystem
 import qualified Data.Map.Lazy as Map
+import qualified Data.Set as Set
 import qualified Physics.Hipmunk as H
-import StringTable.Atom
 
 initialScaleState :: ScaleState
 initialScaleState = Map.empty
@@ -17,9 +18,11 @@ initialScaleState = Map.empty
 initialTransformState :: TransformState
 initialTransformState = Map.empty
 
-type ScaleState = Map.Map Serial (Float, Float)
+initialTransformComponents :: TransformComponents
+initialTransformComponents = Set.empty
 
-transformComponent :: Component
-transformComponent = Component 0 $ toAtom "transform"
+type ScaleState = Map.Map Entity (Float, Float)
 
-type TransformState = Map.Map Serial H.Position
+type TransformComponents = Set.Set Entity
+
+type TransformState = Map.Map Entity H.Position

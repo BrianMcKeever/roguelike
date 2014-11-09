@@ -18,7 +18,7 @@ import GameState
 import qualified Physics.Hipmunk as H
 
 addPhysics :: H.Mass -> H.Moment -> H.ShapeType -> Entity -> GameState Entity
-addPhysics mass moment shapeType entity@(Entity serial _ _) = do
+addPhysics mass moment shapeType entity = do
     gameData <- get
     let space' = space gameData
     body <- liftIO $ H.newBody mass moment
@@ -28,13 +28,12 @@ addPhysics mass moment shapeType entity@(Entity serial _ _) = do
     -- I am assuming I will only be using simple shapes, so I'm defaulting the
     -- position offset to (0, 0)
 
-    let physicsState' = Map.insert serial (PhysicsData body shape) $ physicsState gameData
+    let physicsState' = Map.insert entity (PhysicsData body shape) $ physicsState gameData
     put gameData{physicsState = physicsState'}
 
-    entity2 <- addComponent physicsComponent entity
-    if hasComponent entity transformComponent
+    if hasTransform entity gameData
     then error "Add physics component before transformationComponent"
-    else return entity2
+    else return entity
 
 createSquare :: Double -> Double -> H.ShapeType
 createSquare width height = H.Polygon [ne, se, sw, nw]
@@ -47,9 +46,9 @@ createSquare width height = H.Polygon [ne, se, sw, nw]
     sw = H.Vector (-halfWidth) (-halfHeight)
 
 getBody :: GameData -> Entity -> H.Body
-getBody gameData (Entity serial _ _) = body
+getBody gameData entity = body
     where
-    (PhysicsData body _) = physicsState gameData Map.! serial
+    (PhysicsData body _) = physicsState gameData Map.! entity
 
 getVelocity :: GameData -> Entity -> IO H.Velocity
 getVelocity gameData entity = do

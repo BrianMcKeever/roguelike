@@ -1,7 +1,5 @@
 module World (
-    groundBrick,
     loadMap,
-    tree,
     renderGround
 )
 where
@@ -13,14 +11,13 @@ import GameState
 import GHC.Float
 import EntityComponentSystem
 import qualified Physics.Hipmunk as H
-import StringTable.Atom
 import System.Random
 
 createBrick :: Double -> Double -> GameState ()
 createBrick x y = do
-    entity <- createEntity groundBrick
-    entity2 <- addTransform (H.Vector x y) normalScale normalScale entity
-    addRenderable entity2 renderGround
+    entity <- createEntity
+    addTransform (H.Vector x y) normalScale normalScale entity
+    addRenderable entity renderGround
 
     --Todo  this doesn't belong here
     roll <- generateRandomBetween (0, 100)
@@ -39,9 +36,6 @@ generateRandomBetween range = do
     let (roll, randomState') = randomR range $ randomState gameData
     put gameData{randomState = randomState'}
     return roll
-
-groundBrick :: Kind
-groundBrick = toAtom "groundBrick"
 
 loadMap :: GameState ()
 loadMap = foldState createRow tileRange

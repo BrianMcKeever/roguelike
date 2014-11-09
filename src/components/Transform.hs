@@ -2,19 +2,18 @@ module Components.Transform (
     addTransform,
     getPosition,
     getScale,
+    hasTransform,
     positionToPoint,
     Position,
-    removeTransform,
     setPosition,
-    transformComponent,
     withinBox
 )
 where
 import EntityComponentSystem
 import Components.PhysicsBase
-import Components.TransformBase
 import Control.Monad.State.Lazy
 import qualified Data.Map.Lazy as Map
+import qualified Data.Set as Set
 import qualified Data.StateVar as S
 import GameState
 import GHC.Float
@@ -24,23 +23,28 @@ import qualified Physics.Hipmunk as H
 
 addTransform :: H.Position -> Float -> Float -> Entity -> GameState Entity
 addTransform coordinate scaleX scaleY entity = do
-    entity2 <- addComponent transformComponent entity
-    setPosition coordinate entity2 
-    setScale scaleX scaleY entity2
-    return entity2
+    gameData <- get
+    let components' = Set.insert entity $ transformComponents gameData
+    put gameData{transformComponents = components'}
+    setPosition coordinate entity
+    setScale scaleX scaleY entity
+    return entity
 
 getPosition :: Entity -> GameState H.Position
-getPosition entity@(Entity serial _ _) = do
+getPosition entity = do
     gameData <- get
-    let (PhysicsData body _) = physicsState gameData Map.! serial
-    if hasComponent entity physicsComponent
+    let (PhysicsData body _) = physicsState gameData Map.! entity
+    if hasComponent entity gameData physicsComponent
     then do 
         position <- liftIO $ S.get $ H.position body
         return position
-    else return $ transformState gameData Map.! serial
+    else return $ transformState gameData Map.! entity
 
 getScale :: GameData -> Entity -> (Float, Float)
-getScale gameData (Entity serial _ _) = scaleState gameData Map.! serial
+getScale gameData entity = scaleState gameData Map.! entity
+
+hasTransform :: Entity -> GameData -> Bool
+hasTransform entity gameData = Set.member entity $ transformComponents gameData
 
 type Position = H.Position
 
@@ -53,35 +57,23 @@ rectangleToCornerPoints ((x, y), (width, height)) = ((x - halfWidth, y - halfHei
     halfWidth = width/2
     halfHeight = height/2
 
---This function should be removed
-removeTransform :: Entity -> GameState Entity
-removeTransform entity@(Entity serial _ _) =
-    if hasComponent entity physicsComponent
-    then error  "undefined removeTransform execution path"
-    -- I'm not sure what this would involve. Sould I remove the physics
-    -- component as well?
-    else do
-        gameData <- get
-        put gameData{transformState = Map.delete serial $ transformState gameData}
-        removeComponent transformComponent entity
-    
 setPosition :: H.Position -> Entity -> GameState ()
-setPosition coordinate entity@(Entity serial _ _) = do
+setPosition coordinate entity = do
     -- I am hiding that positions for non-collideables are different than
     -- positions for collideables
     gameData <- get
-    let (PhysicsData body _) = physicsState gameData Map.! serial
-    if hasComponent entity physicsComponent
+    let (PhysicsData body _) = physicsState gameData Map.! entity
+    if hasComponent entity gameData physicsComponent
         then liftIO $ H.position body S.$= coordinate
         else do
-            let transformState' = Map.insert serial coordinate $ transformState gameData
+            let transformState' = Map.insert entity coordinate $ transformState gameData
             put gameData{transformState = transformState'}
     return ()
 
 setScale :: Float -> Float -> Entity -> GameState ()
-setScale x y (Entity serial _ _) = do
+setScale x y entity = do
     gameData <- get
-    let scaleState' = Map.insert serial (x, y) $ scaleState gameData
+    let scaleState' = Map.insert entity (x, y) $ scaleState gameData
     put gameData{scaleState = scaleState'}
 
 withinBox :: Rect -> Entity -> GameState Bool

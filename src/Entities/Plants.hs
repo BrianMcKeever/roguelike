@@ -1,7 +1,6 @@
 module Entities.Plants (
     createTree,
-    renderTree,
-    tree
+    renderTree
 )
 where
 import Components.Physics
@@ -10,19 +9,15 @@ import Components.Transform
 import GameState
 import GHC.Float
 import EntityComponentSystem
-import StringTable.Atom
 
 createTree :: Position -> GameState Entity
 createTree position = do
-    entity <- createEntity tree
+    entity <- createEntity
     let square = createSquare (15 * float2Double normalScale) (15 * float2Double normalScale)
-    entity2 <- addPhysics 1 1 square entity
-    entity3 <- addTransform position 4 4 entity2
-    entity4 <- addRenderable entity3 renderTree
-    return entity4
+    addPhysics 1 1 square entity
+    addTransform position 4 4 entity
+    addRenderable entity renderTree
+    return entity
 
 renderTree :: Float -> Entity -> GameState ()
 renderTree = basicRender Body "tree"
-
-tree :: Kind
-tree = toAtom "tree"

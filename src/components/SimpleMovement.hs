@@ -3,7 +3,6 @@ module Components.SimpleMovement (
     Destination(..),
     getDestination,
     setDestination,
-    simpleMovementComponent,
     updateSimpleMovement
 )
 where
@@ -22,8 +21,8 @@ import qualified Physics.Hipmunk as H
 -- SimpleMovement moves the entity in a straight line towards the destination
 -- and stops if it arrives or it collides with something.
 
-addSimpleMovement :: Entity -> GameState Entity
-addSimpleMovement = addComponent simpleMovementComponent
+addSimpleMovement :: Entity -> GameState ()
+addSimpleMovement = setDestination Nowhere
 
 deceleration :: Double
 deceleration = 10
@@ -34,22 +33,22 @@ distance :: H.Position -> H.Position -> H.Distance
 distance position1 position2 = H.len $ position1 - position2
 
 getDestination :: GameData -> Entity -> Destination
-getDestination gameData (Entity serial _ _) = destination
+getDestination gameData entity = destination
     where
-    maybeDestination = Map.lookup serial $ simpleMovementState gameData
+    maybeDestination = Map.lookup entity $ simpleMovementState gameData
     destination = fromMaybe Nowhere maybeDestination
 
 maxSpeed :: Double
 maxSpeed = 400
 
 setDestination :: Destination -> Entity -> GameState ()
-setDestination destination (Entity serial _ _) = do
+setDestination destination entity = do
     gameData <- get
-    let movementState = Map.insert serial destination $ simpleMovementState gameData
+    let movementState = Map.insert entity destination $ simpleMovementState gameData
     put gameData {simpleMovementState = movementState}
 
-updateSimpleMovement :: Float -> Entity -> GameState ()
-updateSimpleMovement tick entity = do
+updateEntityMovement :: Float -> Entity -> GameState()
+updateEntityMovement tick entity = do
 --This is more or less the "Arrive" steering behavior from Programming Game AI
 --by Example. 
     gameData <- get
@@ -70,3 +69,8 @@ updateSimpleMovement tick entity = do
             let speed'' = min speed' maxSpeed 
             let velocity' = H.scale (position - goal) $ float2Double tick *(-speed'')/distance'
             setVelocity velocity' entity
+
+updateSimpleMovement :: Float -> [Entity] -> GameState ()
+updateSimpleMovement tick entities' = 
+-- We could to better by implementing this as a merge like in merge sort
+    foldState (updateEntityMovement tick) entities'

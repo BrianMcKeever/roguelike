@@ -1,15 +1,9 @@
 module Components.RenderableBase (
-    renderableComponent,
     RenderData(..),
     ZIndex(..)
 )
 where
-import EntityComponentSystem
 import Graphics.Gloss.Game
-import StringTable.Atom
-
-renderableComponent :: Component
-renderableComponent = Component 0 $ toAtom "renderable"
 
 data RenderData = RenderData ZIndex Picture
 
