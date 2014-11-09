@@ -53,8 +53,8 @@ getNextSerial = do
     put gameData {entitySerial = serial + 1}
     return serial
 
-hasComponent :: Entity -> GameData -> Component -> Bool
-hasComponent entity gameData component = result
+hasComponent :: Component -> GameData -> Entity -> Bool
+hasComponent component gameData entity = result
     where
     components' = components gameData
     maybeComponents = Map.lookup entity components'

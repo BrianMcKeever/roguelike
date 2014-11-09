@@ -3,9 +3,8 @@ module Entities.Plants (
     renderTree
 )
 where
-import Components.Physics
 import Components.Renderable
-import Components.Transform
+import Components.TransformAndPhysics
 import GameState
 import GHC.Float
 import EntityComponentSystem

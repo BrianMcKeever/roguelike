@@ -1,25 +1,50 @@
-module Components.Transform (
+module Components.TransformAndPhysics (
+    addPhysics,
     addTransform,
+    createSquare,
+    getBody,
     getPosition,
     getScale,
     hasTransform,
+    getVelocity,
+    hasPhysics,
     positionToPoint,
     Position,
     setPosition,
-    withinBox
+    withinBox,
+    setVelocity
 )
 where
-import EntityComponentSystem
 import Components.PhysicsBase
 import Control.Monad.State.Lazy
 import qualified Data.Map.Lazy as Map
 import qualified Data.Set as Set
 import qualified Data.StateVar as S
+import EntityComponentSystem
 import GameState
 import GHC.Float
 import Graphics.Gloss.Data.Point
 import Graphics.Gloss.Game
 import qualified Physics.Hipmunk as H
+
+addPhysics :: H.Mass -> H.Moment -> H.ShapeType -> Entity -> GameState Entity
+addPhysics mass moment shapeType entity = do
+    addComponent physicsComponent entity
+    gameData <- get
+    let space' = space gameData
+    body <- liftIO $ H.newBody mass moment
+    liftIO $ H.spaceAdd space' body
+    shape <- liftIO $ H.newShape body shapeType $ H.Vector 0 0
+    liftIO $ H.spaceAdd space' shape
+    -- I am assuming I will only be using simple shapes, so I'm defaulting the
+    -- position offset to (0, 0)
+
+    let physicsState' = Map.insert entity (PhysicsData body shape) $ physicsState gameData
+    put gameData{physicsState = physicsState'}
+
+    if hasTransform entity gameData
+    then error "Add physics component before transformationComponent"
+    else return entity
 
 addTransform :: H.Position -> Float -> Float -> Entity -> GameState Entity
 addTransform coordinate scaleX scaleY entity = do
@@ -30,18 +55,38 @@ addTransform coordinate scaleX scaleY entity = do
     setScale scaleX scaleY entity
     return entity
 
-getPosition :: Entity -> GameState H.Position
-getPosition entity = do
-    gameData <- get
+createSquare :: Double -> Double -> H.ShapeType
+createSquare width height = H.Polygon [ne, se, sw, nw]
+    where
+    halfWidth = width/2
+    halfHeight = height/2
+    ne = H.Vector halfWidth halfHeight
+    se = H.Vector halfWidth (-halfHeight)
+    nw = H.Vector (-halfWidth) halfHeight
+    sw = H.Vector (-halfWidth) (-halfHeight)
+
+getBody :: GameData -> Entity -> H.Body
+getBody gameData entity = body
+    where
+    (PhysicsData body _) = physicsState gameData Map.! entity
+
+getPosition :: Entity -> GameData -> IO H.Position
+getPosition entity gameData = do
     let (PhysicsData body _) = physicsState gameData Map.! entity
-    if hasComponent entity gameData physicsComponent
-    then do 
-        position <- liftIO $ S.get $ H.position body
-        return position
+    if hasPhysics gameData entity
+    then S.get $ H.position body
     else return $ transformState gameData Map.! entity
 
 getScale :: GameData -> Entity -> (Float, Float)
 getScale gameData entity = scaleState gameData Map.! entity
+
+getVelocity :: GameData -> Entity -> IO H.Velocity
+getVelocity gameData entity = do
+    let body = getBody gameData entity
+    S.get $ H.velocity body
+
+hasPhysics :: GameData -> Entity -> Bool
+hasPhysics = hasComponent physicsComponent
 
 hasTransform :: Entity -> GameData -> Bool
 hasTransform entity gameData = Set.member entity $ transformComponents gameData
@@ -63,7 +108,7 @@ setPosition coordinate entity = do
     -- positions for collideables
     gameData <- get
     let (PhysicsData body _) = physicsState gameData Map.! entity
-    if hasComponent entity gameData physicsComponent
+    if hasPhysics gameData entity
         then liftIO $ H.position body S.$= coordinate
         else do
             let transformState' = Map.insert entity coordinate $ transformState gameData
@@ -76,8 +121,15 @@ setScale x y entity = do
     let scaleState' = Map.insert entity (x, y) $ scaleState gameData
     put gameData{scaleState = scaleState'}
 
+setVelocity :: H.Velocity -> Entity -> GameState ()
+setVelocity velocity entity = do
+    gameData <- get
+    let body = getBody gameData entity
+    liftIO $ H.velocity body S.$= velocity
+
 withinBox :: Rect -> Entity -> GameState Bool
 withinBox box entity = do
-    entityPosition <- getPosition entity
+    gameData <- get
+    entityPosition <- liftIO $ getPosition entity gameData
     let (leftCorner, rightCorner) = rectangleToCornerPoints box
     return $ pointInBox (positionToPoint entityPosition) leftCorner rightCorner

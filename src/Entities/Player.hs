@@ -3,10 +3,9 @@ module Entities.Player (
     renderPlayer
 )
 where
-import Components.Physics
 import Components.Renderable
 import Components.SimpleMovement
-import Components.Transform
+import Components.TransformAndPhysics
 import Control.Monad.State.Lazy
 import GameState
 import GHC.Float

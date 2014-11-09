@@ -1,6 +1,6 @@
 import Components.Renderable
 import Components.SimpleMovement
-import Components.Transform
+import Components.TransformAndPhysics
 import Control.Monad
 import Control.Monad.State.Lazy
 import qualified Data.Map as Map
@@ -35,7 +35,7 @@ main = do
     tiles' <- loadTiles
     gameData' <- execStateT (createPlayer (H.Vector 0 0)) gameData
     gameData'' <- execStateT loadMap gameData' {tiles = tiles'}
-    playIO (InWindow windowTitle (windowWidth, windowHeight) (50, 50)) white 10 gameData'' draw handleInput update
+    playIO (InWindow windowTitle (windowWidth, windowHeight) (50, 50)) white 30 gameData'' draw handleInput update
 
 update :: Float -> GameData -> IO GameData
 update tick gameData = do

@@ -3,8 +3,8 @@ module World (
     renderGround
 )
 where
-import Components.Transform
 import Components.Renderable
+import Components.TransformAndPhysics
 import Control.Monad.State.Lazy
 import Entities.Plants
 import GameState

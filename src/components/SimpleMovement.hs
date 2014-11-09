@@ -6,9 +6,8 @@ module Components.SimpleMovement (
     updateSimpleMovement
 )
 where
-import Components.Physics
 import Components.SimpleMovementBase
-import Components.Transform
+import Components.TransformAndPhysics
 --import Components.Transform
 import Control.Monad.State.Lazy
 import qualified Data.Map.Lazy as Map
@@ -56,7 +55,7 @@ updateEntityMovement tick entity = do
     if destination == Nowhere 
     then return () 
     else do
-        position <- getPosition entity
+        position <- liftIO $ getPosition entity gameData
         let goal = case destination of
                 (Location location) -> location
                 Nowhere -> error "should be impossible"

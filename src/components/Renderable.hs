@@ -7,9 +7,8 @@ module Components.Renderable (
     ZIndex(..)
 )
 where
-import Components.Transform
+import Components.TransformAndPhysics
 import Components.RenderableBase
-import Control.Applicative
 import Control.Monad.State.Lazy
 import qualified Data.Map.Lazy as Map
 import Data.List.Ordered
@@ -28,7 +27,8 @@ basicRender :: ZIndex -> String -> Float -> Entity -> GameState ()
 basicRender zindex tileName _ entity = do
     gameData <- get
     let tile = tiles gameData Map.! tileName
-    (x, y) <- positionToPoint <$> getPosition entity
+    position <- liftIO $ getPosition entity gameData
+    let (x, y) = positionToPoint position
     let (scaleX, scaleY) = getScale gameData entity
     let tile' = translate x y $ scale scaleX scaleY tile
     --TODO  scaling all of the tiles every frame is probably bad
