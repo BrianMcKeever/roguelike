@@ -39,10 +39,14 @@ main = do
 
 update :: Float -> GameData -> IO GameData
 update tick gameData = do
-    gameData' <- execStateT (updateGame tick) gameData
-    gameData'' <- execStateT (updateGraphics tick) gameData'
-    H.step (space gameData'') $ float2Double tick
-    return gameData''
+    gameData' <- execStateT f gameData
+    H.step (space gameData') $ float2Double tick
+    return gameData'
+    where
+    f :: GameState ()
+    f = do
+        updateGame tick
+        updateGraphics tick
 
 updateEntityGraphic :: Float -> Entity -> GameState ()
 updateEntityGraphic tick entity = do
