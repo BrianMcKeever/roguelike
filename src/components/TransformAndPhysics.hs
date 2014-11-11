@@ -38,7 +38,9 @@ addPhysics mass moment shapeType entity isStatic = do
         else liftIO $ H.newBody mass moment
     liftIO $ H.spaceAdd space' body
     shape <- liftIO $ H.newShape body shapeType $ H.Vector 0 0
-    liftIO $ H.spaceAdd space' shape
+    liftIO $ if isStatic
+    then H.spaceAdd space' $ H.Static shape
+    else H.spaceAdd space' shape
 
     -- I am assuming I will only be using simple shapes, so I'm defaulting the
     -- position offset to (0, 0)
