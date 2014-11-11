@@ -7,6 +7,7 @@ import qualified Data.Map as Map
 --import Data.Maybe
 import qualified Data.Set as Set
 import Entities.Player
+import Entities.Projectiles
 import EntityComponentSystem
 import GHC.Float
 import GameState
@@ -28,14 +29,21 @@ handleInput (EventKey (MouseButton RightButton) Up _ (x, y)) gameData =
     execStateT (setDestination (Location $ H.Vector (float2Double x) $ float2Double y) $ player gameData) gameData
 handleInput _ gameData = return gameData
 
+loadGame :: GameState ()
+loadGame = do
+    tiles' <- liftIO loadTiles
+    gameData <- get
+    put gameData {tiles = tiles'}
+    createPlayer (H.Vector 0 0)
+    createLightningBall (H.Vector 60 0)
+    loadMap 
+
 main :: IO ()
 main = do
     H.initChipmunk
-    gameData <- initialGameData
-    tiles' <- loadTiles
-    gameData' <- execStateT (createPlayer (H.Vector 0 0)) gameData
-    gameData'' <- execStateT loadMap gameData' {tiles = tiles'}
-    playIO (InWindow windowTitle (windowWidth, windowHeight) (50, 50)) white 30 gameData'' draw handleInput update
+    gameData <- liftIO initialGameData
+    gameData' <- execStateT loadGame gameData
+    playIO (InWindow windowTitle (windowWidth, windowHeight) (50, 50)) white 30 gameData' draw handleInput update
 
 update :: Float -> GameData -> IO GameData
 update tick gameData = do
