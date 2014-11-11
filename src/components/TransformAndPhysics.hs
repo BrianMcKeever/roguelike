@@ -32,12 +32,14 @@ addPhysics mass moment shapeType entity isStatic = do
     addComponent physicsComponent entity
     gameData <- get
     let space' = space gameData
-    body <- liftIO $ H.newBody mass moment
+    body <- if isStatic
+        then liftIO $ H.newBody H.infinity H.infinity
+            --TODO when it is possible to add static bodies, we need to add them
+        else liftIO $ H.newBody mass moment
     liftIO $ H.spaceAdd space' body
     shape <- liftIO $ H.newShape body shapeType $ H.Vector 0 0
-    if isStatic
-        then liftIO $ H.spaceAdd space' $ H.Static shape
-        else liftIO $ H.spaceAdd space' shape
+    liftIO $ H.spaceAdd space' shape
+
     -- I am assuming I will only be using simple shapes, so I'm defaulting the
     -- position offset to (0, 0)
 
