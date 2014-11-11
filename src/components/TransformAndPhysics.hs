@@ -45,7 +45,7 @@ addPhysics mass moment shapeType entity isStatic = do
     -- I am assuming I will only be using simple shapes, so I'm defaulting the
     -- position offset to (0, 0)
 
-    let physicsState' = Map.insert entity (PhysicsData body shape) $ physicsState gameData
+    let physicsState' = Map.insert entity (PhysicsData body shape isStatic) $ physicsState gameData
     put gameData{physicsState = physicsState'}
 
     if hasTransform entity gameData
@@ -74,11 +74,11 @@ createSquare width height = H.Polygon [ne, se, sw, nw]
 getBody :: GameData -> Entity -> H.Body
 getBody gameData entity = body
     where
-    (PhysicsData body _) = physicsState gameData Map.! entity
+    (PhysicsData body _ _) = physicsState gameData Map.! entity
 
 getPosition :: Entity -> GameData -> IO H.Position
 getPosition entity gameData = do
-    let (PhysicsData body _) = physicsState gameData Map.! entity
+    let (PhysicsData body _ _) = physicsState gameData Map.! entity
     if hasPhysics gameData entity
     then S.get $ H.position body
     else return $ transformState gameData Map.! entity
@@ -113,9 +113,11 @@ setPosition coordinate entity = do
     -- I am hiding that positions for non-collideables are different than
     -- positions for collideables
     gameData <- get
-    let (PhysicsData body _) = physicsState gameData Map.! entity
+    let (PhysicsData body _ isStatic) = physicsState gameData Map.! entity
     if hasPhysics gameData entity
-        then liftIO $ H.position body S.$= coordinate
+        then do
+            liftIO $ H.position body S.$= coordinate
+            when isStatic $ liftIO $ H.rehashStatic $ space gameData
         else do
             let transformState' = Map.insert entity coordinate $ transformState gameData
             put gameData{transformState = transformState'}

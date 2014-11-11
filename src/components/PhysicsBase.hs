@@ -15,7 +15,7 @@ initialPhysicsState = Map.empty
 physicsComponent :: Component
 physicsComponent = createComponent "physics"
 
-data PhysicsData = PhysicsData H.Body H.Shape
+data PhysicsData = PhysicsData H.Body H.Shape Bool
 -- Again, I'm assuming I will only be using simple shapes, and won't be using
 -- any combined shapes.
 
