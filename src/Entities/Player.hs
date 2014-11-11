@@ -15,7 +15,7 @@ createPlayer :: Position -> GameState Entity
 createPlayer position = do
     entity <- createEntity
     let square = createSquare (12 * float2Double normalScale) (16 * float2Double normalScale)
-    addPhysics 1 1 square entity
+    addPhysics 1 1 square entity False
     addTransform position 4 4 entity
     addSimpleMovement entity
     gameData <- get

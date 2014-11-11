@@ -27,15 +27,17 @@ import Graphics.Gloss.Data.Point
 import Graphics.Gloss.Game
 import qualified Physics.Hipmunk as H
 
-addPhysics :: H.Mass -> H.Moment -> H.ShapeType -> Entity -> GameState Entity
-addPhysics mass moment shapeType entity = do
+addPhysics :: H.Mass -> H.Moment -> H.ShapeType -> Entity -> Bool -> GameState Entity
+addPhysics mass moment shapeType entity isStatic = do
     addComponent physicsComponent entity
     gameData <- get
     let space' = space gameData
     body <- liftIO $ H.newBody mass moment
     liftIO $ H.spaceAdd space' body
     shape <- liftIO $ H.newShape body shapeType $ H.Vector 0 0
-    liftIO $ H.spaceAdd space' shape
+    if isStatic
+        then liftIO $ H.spaceAdd space' $ H.Static shape
+        else liftIO $ H.spaceAdd space' shape
     -- I am assuming I will only be using simple shapes, so I'm defaulting the
     -- position offset to (0, 0)
 

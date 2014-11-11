@@ -38,7 +38,7 @@ getDestination gameData entity = destination
     destination = fromMaybe Nowhere maybeDestination
 
 maxSpeed :: Double
-maxSpeed = 400
+maxSpeed = 800
 
 setDestination :: Destination -> Entity -> GameState ()
 setDestination destination entity = do
