@@ -26,7 +26,7 @@ addSimpleMovement entity = do
     setDestination Nowhere entity
 
 deceleration :: Double
-deceleration = 10
+deceleration = 100
 --lower decelerates slower over a greater period of time
 --don't do 0
 
@@ -40,7 +40,7 @@ getDestination gameData entity = destination
     destination = fromMaybe Nowhere maybeDestination
 
 maxSpeed :: Double
-maxSpeed = 800
+maxSpeed = 6000
 
 removeSimpleMovement :: Entity -> GameState ()
 removeSimpleMovement entity = do
@@ -83,7 +83,7 @@ updateEntityMovement tick entity = do
             --velocity <- getVelocity gameData entity
             let speed' = distance' * deceleration
             let speed'' = min speed' maxSpeed 
-            let velocity' = H.scale (position - goal) $ float2Double tick *(-speed'')/distance'
+            let velocity' = H.scale (position - goal) $ float2Double tick * (-speed'')/distance'
             setVelocity velocity' entity
 
 updateSimpleMovement :: Float -> [Entity] -> GameState ()
