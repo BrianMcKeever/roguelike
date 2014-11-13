@@ -18,6 +18,7 @@ import Graphics.Gloss.Game
 
 addRenderable :: Entity -> (Float -> Entity -> GameState ()) -> GameState Entity
 addRenderable entity f = do
+    genericAddComponent renderableComponent entity
     gameData <- get
     let renderFunctions' = Map.insert entity f $ renderFunctions gameData
     put gameData{renderFunctions = renderFunctions'}
@@ -41,3 +42,19 @@ hasRenderable entity gameData = Map.member entity $ renderFunctions gameData
 
 normalScale :: Float
 normalScale = 4
+
+removeRenderable :: Entity -> GameState ()
+removeRenderable entity = do
+    genericRemoveComponent renderableComponent entity
+    gameData <- get
+    let state' = Map.delete entity $ renderFunctions gameData
+
+    put gameData{ renderFunctions = state'}
+
+renderableComponent :: Component
+renderableComponent = Component{
+    hasComponent = genericHasComponent renderableComponent,
+    nameComponent = createComponentName "renderable",
+    removeComponent = removeRenderable
+    }
+

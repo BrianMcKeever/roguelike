@@ -21,7 +21,9 @@ import qualified Physics.Hipmunk as H
 -- and stops if it arrives or it collides with something.
 
 addSimpleMovement :: Entity -> GameState ()
-addSimpleMovement = setDestination Nowhere
+addSimpleMovement entity = do
+    genericAddComponent simpleMovementComponent entity
+    setDestination Nowhere entity
 
 deceleration :: Double
 deceleration = 10
@@ -40,11 +42,26 @@ getDestination gameData entity = destination
 maxSpeed :: Double
 maxSpeed = 800
 
+removeSimpleMovement :: Entity -> GameState ()
+removeSimpleMovement entity = do
+    genericRemoveComponent simpleMovementComponent entity
+    gameData <- get
+    let state' = Map.delete entity $ simpleMovementState gameData
+
+    put gameData{ simpleMovementState = state'}
+
 setDestination :: Destination -> Entity -> GameState ()
 setDestination destination entity = do
     gameData <- get
     let movementState = Map.insert entity destination $ simpleMovementState gameData
     put gameData {simpleMovementState = movementState}
+
+simpleMovementComponent :: Component
+simpleMovementComponent = Component{
+    hasComponent = genericHasComponent simpleMovementComponent,
+    nameComponent = createComponentName "simpleMovement",
+    removeComponent = removeSimpleMovement
+    }
 
 updateEntityMovement :: Float -> Entity -> GameState()
 updateEntityMovement tick entity = do

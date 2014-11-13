@@ -7,9 +7,9 @@ import Components.Renderable
 import Components.TransformAndPhysics
 import Control.Monad.State.Lazy
 import Entities.Plants
+import EntityComponentSystem
 import GameState
 import GHC.Float
-import EntityComponentSystem
 import qualified Physics.Hipmunk as H
 import System.Random
 

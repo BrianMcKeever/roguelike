@@ -1,11 +1,15 @@
 module GameState (
-    addComponent,
+    Component(..),
     createEntity,
+    createComponentName,
+    genericAddComponent,
+    genericHasComponent,
+    genericRemoveComponent,
     foldState,
     GameData(..),
     GameState,
-    hasComponent,
-    initialGameData
+    initialGameData,
+    removeEntity
 )
 where
 import Components.PhysicsBase
@@ -19,17 +23,25 @@ import qualified Data.Set as Set
 import EntityComponentSystem
 import Graphics.Gloss.Game
 import qualified Physics.Hipmunk as H
+import StringTable.Atom
 import System.Random
 
---Only gameState, gameData, and initialCameData deserve to be here. Everything else is here because they were causing circular imports in
---entitycomponentSystem
+data Component = Component {
+    hasComponent :: Entity -> GameData -> Bool,
+    nameComponent :: ComponentName,
+    removeComponent :: Entity -> GameState ()
+}
 
-addComponent :: Component -> Entity -> GameState ()
-addComponent component entity = do
-    gameData <- get
-    let components' = Map.insertWith Set.union entity (Set.singleton component) $ components gameData
-    put gameData{components = components'}
-  
+instance Eq Component where
+    x == y = nameComponent x == nameComponent y
+
+instance Ord Component where
+    x `compare` y = nameComponent x `compare` nameComponent y
+
+type ComponentData = Map.Map Entity (Set.Set Component)
+
+type ComponentName = Atom
+
 createEntity :: GameState Entity
 createEntity = do
     entity <- getNextSerial
@@ -37,6 +49,9 @@ createEntity = do
     let entities' = Set.insert entity $ entities gameData
     put gameData {entities = entities'}
     return entity
+
+createComponentName :: String -> ComponentName
+createComponentName = toAtom
 
 foldState :: (a -> GameState b) -> [a] -> GameState ()
 foldState f list = do
@@ -47,22 +62,7 @@ foldState f list = do
     where
     g gameData' a = execStateT (f a) gameData'
 
-getNextSerial :: GameState Integer
-getNextSerial = do
-    gameData <- get
-    let serial = entitySerial gameData
-    put gameData {entitySerial = serial + 1}
-    return serial
-
-hasComponent :: Component -> GameData -> Entity -> Bool
-hasComponent component gameData entity = result
-    where
-    components' = components gameData
-    maybeComponents = Map.lookup entity components'
-    result = maybe False (Set.member component) maybeComponents
-
 data GameData = GameData {
-    collisions :: IORef [(H.Shape, H.Shape)],
     components :: ComponentData,
     doaCollisions :: IORef [(H.Shape, H.Shape)],
     entitySerial :: Integer, 
@@ -83,14 +83,41 @@ data GameData = GameData {
 
 type GameState = StateT GameData IO
 
+genericAddComponent :: Component -> Entity -> GameState ()
+genericAddComponent component entity = do
+    gameData <- get
+    let components' = Map.insertWith Set.union entity (Set.singleton component) $ components gameData
+    put gameData{components = components'}
+  
+genericHasComponent :: Component -> Entity -> GameData -> Bool
+genericHasComponent component entity gameData = result
+    where
+    components' = components gameData
+    maybeComponents = Map.lookup entity components'
+    result = maybe False (Set.member component) maybeComponents
+
+genericRemoveComponent :: Component -> Entity -> GameState ()
+genericRemoveComponent component entity = do
+    gameData <- get
+    let components' = components gameData
+    put gameData{components = Map.adjust (Set.delete component) entity components'}
+
+getComponents :: Entity -> GameData -> Set.Set Component
+getComponents entity gameData = components gameData Map.! entity
+
+getNextSerial :: GameState Integer
+getNextSerial = do
+    gameData <- get
+    let serial = entitySerial gameData
+    put gameData {entitySerial = serial + 1}
+    return serial
+
 initialGameData :: IO GameData
 initialGameData = do
-    collisions' <- newIORef []
     etherealCollisions' <- newIORef []
     doaCollisions' <- newIORef []
     space' <- liftIO H.newSpace
     return GameData{
-        collisions = collisions',
         components = initialComponentData,
         doaCollisions = doaCollisions',
         entitySerial = 0, 
@@ -108,3 +135,15 @@ initialGameData = do
         space = space',
         tiles = Map.empty,
         toBeRendered = []}
+
+initialComponentData :: ComponentData
+initialComponentData = Map.empty
+
+removeEntity :: Entity -> GameState ()
+removeEntity entity = do
+    gameData <- get
+    foldState f $ Set.toList $ getComponents entity gameData
+    gameData2 <- get
+    put gameData2{entities = Set.delete entity $ entities gameData2}
+    where
+    f component = removeComponent component entity
