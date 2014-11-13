@@ -14,7 +14,7 @@ createTree position = do
     entity <- createEntity
     let square = createSquare (15 * float2Double normalScale) (15 * float2Double normalScale)
 
-    addPhysics 1 1 square entity True
+    addPhysics collisionTypeNormal 1 1 square entity True
     addTransform position 4 4 entity
     addRenderable entity renderTree
     return entity

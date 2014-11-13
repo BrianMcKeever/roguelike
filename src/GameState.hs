@@ -13,6 +13,7 @@ import Components.RenderableBase
 import Components.SimpleMovementBase
 import Components.TransformBase
 import Control.Monad.State.Lazy
+import Data.IORef
 import qualified Data.Map.Lazy as Map
 import qualified Data.Set as Set
 import EntityComponentSystem
@@ -61,15 +62,19 @@ hasComponent component gameData entity = result
     result = maybe False (Set.member component) maybeComponents
 
 data GameData = GameData {
+    collisions :: IORef [(H.Shape, H.Shape)],
     components :: ComponentData,
+    doaCollisions :: IORef [(H.Shape, H.Shape)],
     entitySerial :: Integer, 
     entities :: Set.Set Entity, 
+    etherealCollisions :: IORef [(H.Shape, H.Shape)],
     physicsState :: PhysicsState,
     player :: Entity,
     randomState :: StdGen, 
     renderFunctions :: Map.Map Entity (Float -> Entity -> GameState ()),
-    simpleMovementState :: SimpleMovementState,
     scaleState :: ScaleState,
+    shapes :: ShapeState,
+    simpleMovementState :: SimpleMovementState,
     space :: H.Space,
     tiles :: Map.Map String Picture,
     toBeRendered :: [RenderData],
@@ -80,16 +85,23 @@ type GameState = StateT GameData IO
 
 initialGameData :: IO GameData
 initialGameData = do
+    collisions' <- newIORef []
+    etherealCollisions' <- newIORef []
+    doaCollisions' <- newIORef []
     space' <- liftIO H.newSpace
     return GameData{
+        collisions = collisions',
         components = initialComponentData,
+        doaCollisions = doaCollisions',
         entitySerial = 0, 
         entities = Set.empty, 
+        etherealCollisions = etherealCollisions',
         transformComponents = initialTransformComponents,
         physicsState = initialPhysicsState,
         player = -666,
         randomState = mkStdGen 1, 
         scaleState = initialScaleState,
+        shapes = initialShapeState,
         simpleMovementState = initialSimpleMovementState,
         transformState = initialTransformState,
         renderFunctions = Map.empty,

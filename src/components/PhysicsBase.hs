@@ -1,8 +1,10 @@
 module Components.PhysicsBase (
     initialPhysicsState,
+    initialShapeState,
     physicsComponent,
     PhysicsData(..),
-    PhysicsState
+    PhysicsState,
+    ShapeState
 )
 where
 import qualified Data.Map.Lazy as Map
@@ -12,6 +14,9 @@ import qualified Physics.Hipmunk as H
 initialPhysicsState :: PhysicsState
 initialPhysicsState = Map.empty
 
+initialShapeState :: ShapeState
+initialShapeState = Map.empty
+
 physicsComponent :: Component
 physicsComponent = createComponent "physics"
 
@@ -20,3 +25,5 @@ data PhysicsData = PhysicsData H.Body H.Shape Bool
 -- any combined shapes.
 
 type PhysicsState = Map.Map Entity PhysicsData
+
+type ShapeState = Map.Map H.Shape Entity

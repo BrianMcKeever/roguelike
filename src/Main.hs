@@ -31,6 +31,7 @@ handleInput _ gameData = return gameData
 
 loadGame :: GameState ()
 loadGame = do
+    initializePhysics
     tiles' <- liftIO loadTiles
     gameData <- get
     put gameData {tiles = tiles'}
@@ -65,6 +66,7 @@ updateEntityGraphic tick entity = do
 
 updateGame :: Float -> GameState ()
 updateGame tick = do
+    updatePhysics
     gameData <- get
     updateSimpleMovement tick $ Set.toList $ entities gameData
     --todo we should limit which entities get updated
