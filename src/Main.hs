@@ -16,7 +16,8 @@ handleInput _ gameData = gameData
 
 main :: IO ()
 main = do
-    play (InWindow windowTitle (windowWidth, windowHeight) (50, 50)) white 30 initialGameData draw handleInput update
+    gameData <- initialGameData
+    play (InWindow windowTitle (windowWidth, windowHeight) (50, 50)) white 60 gameData draw handleInput update
 
 update :: Float -> GameData -> GameData
 update _ gameData = gameData

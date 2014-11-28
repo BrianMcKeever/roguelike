@@ -14,12 +14,11 @@ executable rogue
         gloss-game,
         gloss-juicy,
         gloss-raster,
-        Hipmunk,
+        htiled,
         JuicyPixels,
         mtl,
         random,
         StateVar,
-        stringtable-atom,
         unordered-containers,
         vector
     hs-source-dirs:      src
