@@ -20,7 +20,8 @@ executable rogue
         random,
         StateVar,
         stringtable-atom,
-        unordered-containers
+        unordered-containers,
+        vector
     hs-source-dirs:      src
     default-language:    Haskell2010
     ghc-options:         -Wall -Werror -threaded -O2 -auto-all -rtsopts -caf-all -fno-warn-unused-do-bind
