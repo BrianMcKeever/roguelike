@@ -11,7 +11,7 @@ import Graphics.Gloss.Interface.Pure.Game
 import Tiles
 
 draw :: GameData -> Picture
-draw gameData = renderArea (tiles gameData) (tiledMap gameData) (23, 13)
+draw gameData = renderArea (tiles gameData) (tiledMap gameData) (23.5, 13)
 
 handleInput :: Event -> GameData -> GameData
 handleInput _ gameData = gameData

@@ -68,14 +68,12 @@ renderArea :: Vector.Vector Picture -> Tiled.TiledMap -> (Float, Float) -> Pictu
 renderArea tiles tiledMap (x, y) = translate xOffset yOffset $ pictures tilePictures
     where
     layer = head $ Tiled.mapLayers tiledMap -- we are ensuring the first layer is the floor layer in loadTiles
-    xs = Vector.enumFromStepN (floor x - sightRangeX - 1) 1 numberHorizontalTiles
-    --I'm subtracting - 1 from sightRangeX because the extra partial tile is on the
-    --left side of the screen
+    xs = Vector.enumFromStepN (floor x - sightRangeX) 1 numberHorizontalTiles
     ys = Vector.enumFromStepN (floor y - sightRangeY) 1 numberVerticalTiles
     tileCoordinates = flip (,) <$> ys <*> xs
     layerData = Tiled.layerData layer
     tilePictures = Vector.toList $ Vector.map (renderTile tiles layerData) $ Vector.zip tilePositions tileCoordinates
-    xOffset = (snd $ (properFraction x :: (Int, Float))) * pixelScale
+    xOffset = (-(snd $ (properFraction x :: (Int, Float))) * pixelScale)
     yOffset = (snd $ (properFraction y :: (Int, Float))) * pixelScale
 
 --returns a picture of the tile at map coordinate coordinates at xOffset,
@@ -102,5 +100,5 @@ tileDimension = 16
 tilePositions :: Vector.Vector (Float, Float)
 tilePositions = flip (,) <$> ys <*> xs
     where
-    xs = (Vector.enumFromStepN (- fromIntegral sightRangeX * pixelScale - pixelScale) (pixelScale) numberHorizontalTiles)
+    xs = (Vector.enumFromStepN (- fromIntegral sightRangeX * pixelScale) (pixelScale) numberHorizontalTiles)
     ys = (Vector.enumFromStepN (fromIntegral sightRangeY * pixelScale) (-pixelScale) numberVerticalTiles)
