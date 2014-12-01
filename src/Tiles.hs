@@ -81,8 +81,10 @@ renderArea tiles tiledMap (x, y) = translate xOffset yOffset $ pictures tilePict
 renderTile :: Vector.Vector Picture -> Map.Map (Int, Int) Tiled.Tile -> ((Float, Float), (Int, Int)) -> Picture
 renderTile tilePictures layerData ((xOffset, yOffset), coordinates) = translate xOffset yOffset tilePicture
     where
-    tile = layerData Map.! coordinates
-    tilePicture = tilePictures Vector.! (fromIntegral $ Tiled.tileGid tile)
+    tileMaybe = Map.lookup coordinates layerData 
+    tilePicture = case tileMaybe of
+        Nothing -> Blank
+        (Just tile) -> tilePictures Vector.! (fromIntegral $ Tiled.tileGid tile)
 
 scaleFactor :: Float
 scaleFactor = 4
