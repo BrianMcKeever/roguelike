@@ -1,5 +1,6 @@
 module EntityComponentSystem (
-    ComponentMask,
+    Component,
+    componentToMask,
     createMask,
     Entity,
     initialMasks,
@@ -11,34 +12,26 @@ module EntityComponentSystem (
 where
 import Data.Bits
 import Data.List
-import Data.Maybe
-import Data.Tuple
-import qualified Data.Vector.Unboxed as Vector
+import Data.Word
+import qualified Data.Vector as Vector
 
-data ComponentMask = EmptyMask | PhysicsMask | RenderableMask | SimpleMovementMask 
-    deriving (Eq)
+data Component = EmptyMask | PhysicsMask | RenderableMask | SimpleMovementMask 
+    deriving (Enum, Eq, Show)
 
-instance Enum ComponentMask where
-    fromEnum = fromJust . flip lookup componentMaskTable
-    toEnum = fromJust . flip lookup (map swap componentMaskTable)
+componentToMask :: Component -> Mask
+componentToMask component = if enum == 0 then 0 else shift 1 enum
+    where
+    enum = fromEnum component
 
-componentMaskTable :: [(ComponentMask, Mask)]
-componentMaskTable = [
-    (EmptyMask, 0), 
-    (PhysicsMask, shift 1 1), 
-    (RenderableMask, shift 1 2), 
-    (SimpleMovementMask, shift 1 3)
-    ]
+createMask :: [Component] -> Mask
+createMask = foldl' (\m c -> componentToMask c .|. m) 0
 
-createMask :: [ComponentMask] -> Mask
-createMask = foldl' (\m c -> fromEnum c .|. m) 0
-
-type Entity = Int
+type Entity = Word16
 
 initialMasks :: Masks
-initialMasks = Vector.replicate maxEntities $ fromEnum EmptyMask
+initialMasks = Vector.replicate maxEntities $ componentToMask EmptyMask
 
-type Mask = Int
+type Mask = Word32
 
 --If the first argument contains the second argument, true. Otherwise, false
 maskContains :: Mask -> Mask -> Bool

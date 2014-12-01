@@ -12,6 +12,7 @@ import Tiles
 
 draw :: GameData -> Picture
 draw gameData = renderArea (tiles gameData) (tiledMap gameData) (0, 0)
+
 handleInput :: Event -> GameData -> GameData
 handleInput _ gameData = gameData
 
