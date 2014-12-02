@@ -13,15 +13,15 @@ import EntityComponentSystem
 import qualified Data.Vector as Vector
 import Linear.V2
 
-createCollision :: Entity -> Entity -> Collision
-createCollision a b 
-    | a < b     = (a, b)
-    | otherwise = (b, a)
-
 type Collision = (Entity, Entity) 
 -- A collision between a and b. a < b
 
 type Collisions = Vector.Vector Collision
+
+createCollision :: Entity -> Entity -> Collision
+createCollision a b 
+    | a < b     = (a, b)
+    | otherwise = (b, a)
 
 eulerIntegration :: Double -> Vector.Vector (Mask, PhysicsData) -> PhysicsDatas
 eulerIntegration tick input = onlyMap (maskHas physicsMask) integrate input
