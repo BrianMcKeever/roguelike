@@ -16,6 +16,7 @@ executable rogue
         gloss-raster,
         htiled,
         JuicyPixels,
+        linear,
         mtl,
         random,
         StateVar,

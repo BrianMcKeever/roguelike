@@ -4,6 +4,7 @@ module GameState (
     initialGameData
 )
 where
+import Components.Physics
 import Control.Monad.State.Lazy
 --import qualified Data.Map.Lazy as Map
 --import qualified Data.Set as Set
@@ -19,6 +20,7 @@ data GameData = GameData {
     masks :: Masks,
     --physicsComponents :: PhysicsComponents,
     player :: Entity,
+    physicsDatas :: PhysicsDatas,
     randomState :: StdGen,
     tiledMap :: TiledMap,
     tiles :: Vector.Vector Picture
@@ -32,7 +34,7 @@ initialGameData = do
     tiles' <- loadTiles mapFile
     return GameData {
         masks = initialMasks,
-     --   physicsComponents = initialPhysics,
+        physicsDatas = initialPhysics,
         player = -666,
         randomState = mkStdGen 1,
         tiledMap = mapFile,
