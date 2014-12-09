@@ -8,8 +8,7 @@ module EntityComponentSystem (
     maskHas,
     Mask,
     Masks,
-    maxEntities,
-    onlyMap
+    maxEntities
 )
 where
 import Data.Bits
@@ -50,14 +49,3 @@ type Masks = Vector.Vector Mask
 
 maxEntities :: Int
 maxEntities = 3000
-
---This function maps over the zipped vector. If the fst part of the tuple passes
---the predicate, the function is applied to the snd part. Otherwise, the snd
---part is unchanged.
-onlyMap :: (a -> Bool) -> 
-    (b -> b) -> 
-    Vector.Vector (a, b) -> 
-    Vector.Vector b
-onlyMap p f xs = Vector.map pf xs
-    where
-    pf (a, b) = if p a then f b else b 
