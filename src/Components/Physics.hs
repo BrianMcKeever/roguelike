@@ -74,10 +74,6 @@ createSpace mapHeight mapWidth input = result
     bucketIdEntity = Vector.filter (\ (x, _) -> x /= -1) positionEntity
     result = bucketize (mapHeight * mapWidth) bucketIdEntity
 
-data Edge = Edge PointIndex PointIndex 
---We can't reference the point directly because this is Haskell. Instead, we are
---saving the vector indexes of the points that form the edges of our object.
-
 detailedCollisionCheck :: (Ord a, Floating a) => 
     Shape a -> 
     Shape a -> 
@@ -110,6 +106,44 @@ detailedCollisionCheck
         (abs(x1 - x2) < (halfWidth1 + halfWidth2)) && 
         (abs(y1 - y2) < (halfHeight1 + halfHeight2))
 
+data Edge = Edge PointIndex PointIndex 
+--We can't reference the point directly because this is Haskell. Instead, we are
+--saving the vector indexes of the points that form the edges of our object.
+
+edgeToAxis :: Num a => Vector.Vector (Point V2 a) -> Edge -> V2 a
+edgeToAxis points (Edge i j) = perp $ (pointToV2 $ points Vector.! i) - (pointToV2 $ points Vector.! j) 
+
+edgeToV2Pair :: Num a => Vector.Vector (Point V2 a) -> Edge -> (V2 a, V2 a)
+edgeToV2Pair points (Edge i j) = (pointToV2 $ points Vector.! i, pointToV2 $ points Vector.! j)
+
+getAABBSeparatingAxis :: Vector.Vector (V2 a)
+getAABBSeparatingAxis = Vector.fromList [V2 0 1, V2 1 0]
+
+getPolygonSeparatingAxis :: Num a => Shape a -> Vector.Vector (V2 a)
+getPolygonSeparatingAxis (Polygon _ points edges _) = Vector.map (edgeToAxis points) edges
+getPolygonSeparatingAxis _ = error "getPolygonSeparatingAxis should only be called with polygons"
+
+getSeparatingAxis :: (Ord a, Num a) => Shape a -> Shape a -> Vector.Vector (V2 a)
+getSeparatingAxis polygon1@(Polygon _ _ _ _) polygon2@(Polygon _ points2 edges2 _) = 
+    getPolygonSeparatingAxis polygon1 Vector.++ getPolygonSeparatingAxis polygon2
+    --I'm not happy about concatanating the edges, but since the vectors should be very
+    --small, it's not guaronteed that building a vector with unfoldr would be faster.
+getSeparatingAxis polygon@(Polygon _ points edges _) (Circle center _) = getPolygonSeparatingAxis polygon Vector.++ Vector.singleton circleAxis
+    where
+    --http://www.codezealot.org/archives/55
+    --I'm finding the closest point the stupid way because I'm tired of
+    --googling.
+    (P v2) = fst $ Vector.minimumBy (\ (_, a) (_, b) -> compare a b) $ Vector.zip points $ Vector.map (qdA center) points
+    circleAxis = perp v2
+
+getSeparatingAxis c@(Circle _ _) p@(Polygon _ _ _ _) = getSeparatingAxis p c
+getSeparatingAxis (Polygon _ points1 edges1 _) (AABB _ _ _) = getPolygonSeparatingAxis polygon Vector.++ getAABBSeparatingAxis
+getSeparatingAxis a@(AABB _ _ _) p@(Polygon _ _ _ _) = getSeparatingAxis p a
+getSeparatingAxis (AABB _ _ _) (Circle  _ _) = error "getSeparatingAxis should not be called for AABB and circle"
+getSeparatingAxis (Circle _ _) (AABB _ _ _) = error "getSeparatingAxis should not be called for AABB and circle"
+getSeparatingAxis (Circle _ _) (Circle _ _) = error "getSeparatingAxis should not be called for circles"
+getSeparatingAxis (AABB _ _ _) (AABB _ _ _) = error "getSeparatingAxis should not be called for two AABB"
+
 initialPhysics :: PhysicsDatas
 initialPhysics = Vector.replicate maxEntities d
     where
@@ -141,9 +175,30 @@ physicsUpdate tick input = (Vector.empty, Vector.empty, physics)
     where
     newPhysics = verletIntegration tick input
     newPhysics' = satisfyConstraints newPhysics
-    physics = snd $ Vector.unzip newPhysics
+    newPhysics2 = updateCenters newPhysics'
+    physics = snd $ Vector.unzip newPhysics2
 
 type PointIndex = Int
+
+--pointToV2 ::  Point (V2 a) -> V2 a
+pointToV2 (P a) = a
+
+project :: (Ord a, Num a) => V2 a -> Shape a -> V2 a
+project axis (Circle _ radius) = V2 (-radius) radius
+--http://board.flashkit.com/board/showthread.php?787281-Separating-Axis-Theorem
+project axis (AABB center@(P cV2@(V2 x y)) halfWidth halfHeight) = V2 (b - r) $ b + r
+--http://en.wikipedia.org/wiki/Bounding_volume#Basic_intersection_checks
+  where
+  r = halfWidth * abs x + halfHeight * abs y
+  --TODO I'm not sure whether x and y should be absolute valued or get the
+  --magnitude of center
+  b = dot cV2 axis
+project axis (Polygon _ points edges _) = V2 (Vector.minimum projected) $ Vector.maximum projected
+--http://www.codezealot.org/archives/55
+    where
+    v2Pairs = Vector.map (edgeToV2Pair points) edges
+    projected = Vector.map (\(a, b) -> dot a b) v2Pairs
+    
 
 data Shape a = 
     Circle (Point V2 a) a -- center, radius
@@ -157,18 +212,13 @@ data Shape a =
 
 type Space = Vector.Vector (Vector.Vector Entity)
 
---This method will convert the position to the correct bucketIndex. It assumes
---the position it is given is valid and on the map.
-toBucket :: Int -> V2 Double -> Int
-toBucket mapWidth (V2 x y) = floor $ x + y * fromIntegral mapWidth
-
 satisfyConstraints :: Vector.Vector (Mask, PhysicsData) -> Vector.Vector (Mask, PhysicsData)
 satisfyConstraints input = 
     Vector.map solve input
     where
     solve (mask, physics@(PhysicsData _ _ _ invertedMass' _ position' shape')) =
         if hasMask mask physicsMask && not (isStatic physics) && not (isTrigger physics)
-        then undefined
+        then (mask, satisfyLineConstraints physics)
         else (mask, physics)
 
 satisfyLineConstraint :: (Num a , Fractional a) => Shape a -> LineConstraint a -> Shape a
@@ -200,6 +250,17 @@ satisfyLineConstraints physics = case shape physics of
         newShape = Vector.foldl satisfyLineConstraint (shape physics) constraints
         in
         physics {shape = newShape}
+
+--This method will convert the position to the correct bucketIndex. It assumes
+--the position it is given is valid and on the map.
+toBucket :: Int -> V2 Double -> Int
+toBucket mapWidth (V2 x y) = floor $ x + y * fromIntegral mapWidth
+
+--The center of polygons aren't getting updated with collisions for
+--performance's sake, so we need to go back and update all the centers when
+--we're done
+updateCenters :: Vector.Vector (Mask, PhysicsData) -> Vector.Vector (Mask, PhysicsData)
+updateCenters = undefined
 
 verletIntegration :: Double -> Vector.Vector (Mask, PhysicsData) -> Vector.Vector (Mask, PhysicsData)
 verletIntegration tick input = Vector.map integrate input
