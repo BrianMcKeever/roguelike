@@ -4,7 +4,7 @@
 --import qualified Data.Vector as Vector
 --import EntityComponentSystem
 import Components.Physics
-import qualified Data.Vector as Vector
+--import qualified Data.Vector as Vector
 import GHC.Float
 import GameState
 import Graphics.Gloss.Data.Picture
@@ -24,12 +24,17 @@ main = do
     play (InWindow windowTitle (windowWidth, windowHeight) (50, 50)) white 60 gameData draw handleInput update
 
 update :: Float -> GameData -> GameData
-update tick gameData = gameData{physicsDatas = newPhysics}
+update tick gameData = gameData{physics = newPhysics}
     where
     tick' = float2Double tick
     masks' = masks gameData
-    physics = physicsDatas gameData
-    (_, _, newPhysics) = physicsUpdate tick' $ Vector.zip masks' physics
+    bucketWidth = 1
+    bucketHeight = 1
+    mapWidth = 200 * 16 * 4
+    mapHeight = 200 * 16 * 4
+    numberRelaxations = 10
+    newPhysics = 
+        physicsUpdate bucketWidth bucketHeight mapWidth mapHeight numberRelaxations tick' masks' $ physics gameData
 
 windowTitle :: String
 windowTitle = "Rogue Bard"

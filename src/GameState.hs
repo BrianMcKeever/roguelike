@@ -18,9 +18,8 @@ import Tiles
 
 data GameData = GameData {
     masks :: Masks,
-    --physicsComponents :: PhysicsComponents,
     player :: Entity,
-    physicsDatas :: PhysicsDatas,
+    physics :: Physics,
     randomState :: StdGen,
     tiledMap :: TiledMap,
     tiles :: Vector.Vector Picture
@@ -34,7 +33,7 @@ initialGameData = do
     tiles' <- loadTiles mapFile
     return GameData {
         masks = initialMasks,
-        physicsDatas = initialPhysics,
+        physics = initialPhysics,
         player = -666,
         randomState = mkStdGen 1,
         tiledMap = mapFile,

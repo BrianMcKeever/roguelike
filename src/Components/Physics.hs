@@ -2,8 +2,8 @@
 module Components.Physics (
     Collision,
     createCollision,
-    PhysicsData(..),
-    PhysicsDatas,
+    EntityPhysics(..),
+    Physics(..),
     physicsMask,
     physicsUpdate,
     initialPhysics,
@@ -22,7 +22,7 @@ import Linear.Affine
 import Linear.Metric hiding (project)
 import Linear.V2
 import Linear.Vector
-import Prelude as Prelude hiding (filter, foldl, length, map, maximum, minimum, replicate, span, sum, unzip, zip) 
+import Prelude as Prelude hiding ((++), concat, filter, foldl, last, length, map, maximum, minimum, replicate, span, sum, unzip, zip) 
 import Debug.Trace
 
 newtype BucketIndexEntity = BucketIndexEntity (Int, Entity)
@@ -43,7 +43,7 @@ instance Ord BucketIndexEntity where
 bucketize :: Int -> 
     Vector (Int, Entity) -> 
     Space
-bucketize gridSize xs = unfoldrN gridSize generate (0, unwrapped)
+bucketize gridSize xs = unfoldrN gridSize generate' (0, unwrapped)
     where
     wrapped = map BucketIndexEntity xs
     sorted = runST $ do 
@@ -51,7 +51,7 @@ bucketize gridSize xs = unfoldrN gridSize generate (0, unwrapped)
         AF.sort thawed
         freeze thawed
     unwrapped = map (\ (BucketIndexEntity (a, b)) -> (a, b)) sorted
-    generate (a, b) = Just (next, (a + 1, remaining))
+    generate' (a, b) = Just (next, (a + 1, remaining))
         where
         (matching, remaining) = span ((==) a . fst) b
         next = map snd matching
@@ -59,7 +59,7 @@ bucketize gridSize xs = unfoldrN gridSize generate (0, unwrapped)
 type Collision = (Entity, Entity) 
 -- A collision between a and b. a < b
 
-type Collisions = Vector Collision
+type Collisions = Set.Set Collision
 
 createCollision :: Entity -> Entity -> Collision
 createCollision a b 
@@ -68,16 +68,17 @@ createCollision a b
 
 createSpace :: Int -> 
     Int ->
-    Vector (Mask, PhysicsData) -> 
+    Int ->
+    Int ->
+    Vector (Mask, EntityPhysics) -> 
     Space
-createSpace mapHeight mapWidth input = result
+createSpace bucketWidth bucketHeight mapHeight mapWidth input = result
     where
-    positionEntity = imap f input
-    f i (mask, physics) | hasMask mask physicsMask = 
-        (toBucket 1 1 mapWidth $ position physics, fromIntegral i)
-                        | otherwise = (-1, fromIntegral i)
-    bucketIdEntity = filter (\ (x, _) -> x /= -1) positionEntity
-    result = bucketize (mapHeight * mapWidth) bucketIdEntity
+    bucketEntity = imap f input
+    f entity (mask, physics) | hasMask mask physicsMask = 
+        map (\bucket -> (bucket, fromIntegral entity)) $ toBuckets bucketWidth bucketHeight mapWidth $ shape physics
+                        | otherwise = empty
+    result = bucketize (mapHeight * mapWidth) $ foldl' (++) empty bucketEntity
 
 detailedCollisionCheck :: (Ord a, Floating a) => Shape a -> Shape a -> Bool
 detailedCollisionCheck (Circle (P pos1) radius1) (Circle (P pos2) radius2) = 
@@ -128,6 +129,16 @@ edgeToAxis points (Edge i j) = perp $ (pointToV2 $ points ! i) - (pointToV2 $ po
 edgeToV2Pair :: Num a => Vector (Point V2 a) -> Edge -> (V2 a, V2 a)
 edgeToV2Pair points (Edge i j) = (pointToV2 $ points ! i, pointToV2 $ points ! j)
 
+data EntityPhysics = EntityPhysics {
+    force :: V2 Double,
+    isStatic :: Bool, 
+    isTrigger :: Bool, 
+    invertedMass :: Double,
+    oldPosition :: V2 Double,
+    position :: V2 Double,
+    shape :: Shape Double
+    }
+
 getAABBSeparatingAxis :: Num a => Vector (V2 a)
 getAABBSeparatingAxis = fromList [V2 0 1, V2 1 0]
 
@@ -146,8 +157,8 @@ getCenter (Polygon points _ _) = sum points ^* (1 / (fromIntegral $ length point
 getCenterOfBucket :: (RealFrac a) => Int -> Int -> Point V2 a -> Point V2 a
 getCenterOfBucket bucketWidth bucketHeight (P (V2 x y)) = P (V2 (startX + halfWidth) $ startY + halfHeight)
     where
-    startX = fromIntegral $ floor x - (fromIntegral $ mod (floor x) bucketWidth)
-    startY = fromIntegral $ floor y - (fromIntegral $ mod (floor y) bucketHeight)
+    startX = fromIntegral $ floor x - (mod (floor x) bucketWidth)
+    startY = fromIntegral $ floor y - (mod (floor y) bucketHeight)
     halfWidth = fromIntegral bucketWidth / 2
     halfHeight = fromIntegral bucketHeight / 2
 
@@ -162,10 +173,10 @@ getPolygonSeparatingAxis :: Num a => Shape a -> Vector (V2 a)
 getPolygonSeparatingAxis (Polygon points edges _) = map (edgeToAxis points) edges
 getPolygonSeparatingAxis _ = error "getPolygonSeparatingAxis should only be called with polygons"
 
-initialPhysics :: PhysicsDatas
-initialPhysics = replicate maxEntities d
+initialPhysics :: Physics
+initialPhysics = Physics (replicate maxEntities d) Set.empty Set.empty Set.empty empty
     where
-    d = PhysicsData (V2 0 0) False False 0 (V2 0 0) (V2 0 0) (Circle (P (V2 0 0)) 0)
+    d = EntityPhysics (V2 0 0) False False 0 (V2 0 0) (V2 0 0) (Circle (P (V2 0 0)) 0)
 
 -- A LineConstraint is like a stick between 2 points. The physics engine will
 -- try to keep the points the same distance from each other.
@@ -174,7 +185,7 @@ initialPhysics = replicate maxEntities d
 data LineConstraint a = LineConstraint PointIndex PointIndex a -- distance 
 
 getOverlap :: (Num a, Ord a) => (a, a) -> (a, a) -> Maybe a
-getOverlap a@(min1, max1) b@(min2, max2) = do
+getOverlap (min1, max1) (min2, max2) = do
     --I tried to find a way to do this with less comparisons, but I failed
     when (max1 <= min2) Nothing
     when (max2 <= min1) Nothing
@@ -190,44 +201,51 @@ getOverlap a@(min1, max1) b@(min2, max2) = do
 overlaps :: (Num a, Ord a) => (a, a) -> (a, a) -> Bool
 overlaps a b = isJust $ getOverlap a b
 
-data PhysicsData = PhysicsData {
-    force :: V2 Double,
-    isStatic :: Bool, 
-    isTrigger :: Bool, 
-    invertedMass :: Double,
-    oldPosition :: V2 Double,
-    position :: V2 Double,
-    shape :: Shape Double
+data Physics = Physics {
+    entityPhysics :: (Vector EntityPhysics),
+    newCollisions :: Collisions,
+    noLongerCollisions :: Collisions,
+    remainingCollisions :: Collisions,
+    space :: Space
     }
-
-type PhysicsDatas = Vector PhysicsData
 
 physicsMask :: Mask
 physicsMask = componentToMask PhysicsComponent
 
-physicsUpdate :: Double -> 
-    Vector (Mask, PhysicsData) -> 
-    (Collisions, Collisions, PhysicsDatas) --newCollisions, oldCollisions
-physicsUpdate tick input = (empty, empty, physics)
+physicsUpdate :: 
+    Int -> -- bucketWidth
+    Int -> -- bucketHeight
+    Int -> -- mapWidth
+    Int -> -- mapHeight
+    Int -> -- numberRelaxations
+    Double -> 
+    Vector Mask -> 
+    Physics -> 
+    Physics 
+physicsUpdate bucketWidth bucketHeight mapWidth mapHeight numberRelaxations tick masks physics = physics'
     where
-    newPhysics = verletIntegration tick input
-    --bucketize everything 
-    -- figure out what's colliding
-    -- new collisions = collisions - oldCollisions
-    --for 1 to number relaxations:
-        --do collisions within buckets
-        --check constraints
-    --do collisions
-    --no longer colliding = oldCollisions - collisions
-    --stay collisions = collisions and oldCollisions
-    newPhysics' = satisfyConstraints newPhysics
-    physics = snd $ unzip newPhysics
+    integratedPhysics = verletIntegration tick $ zip masks $ entityPhysics physics
+    space' = createSpace bucketWidth bucketHeight mapHeight mapWidth $ zip masks integratedPhysics
+    (collisions, onceRelaxedPhysics) = resolveCollisions space' $ zip masks integratedPhysics
+    oldCollisions = remainingCollisions physics
+    newCollisions' = Set.difference collisions oldCollisions
+
+    maybeRelax x = Just $ (result, result)
+        where
+        result = relax space' masks x
+
+    (remainingCollisions', entityPhysics') = last $ unfoldrN numberRelaxations maybeRelax (Set.empty, onceRelaxedPhysics)
+    noLongerCollisions' = Set.difference oldCollisions remainingCollisions'
+
+    physics' = Physics (entityPhysics') newCollisions' noLongerCollisions' remainingCollisions' space'
 
 type PointIndex = Int
 
 pointToV2 ::  Point V2 a -> V2 a
 pointToV2 (P a) = a
 
+--TODO this function needs to be throughly tested, as it's certainly wrong in
+--some cases
 project :: (Ord a, Num a) => V2 a -> Shape a -> (a, a)
 project axis (Circle _ radius) = ((-radius), radius)
 --TODO: this is almost surely wrong
@@ -245,6 +263,15 @@ project axis (Polygon points edges _) = ((minimum projected), maximum projected)
     v2Pairs = map (edgeToV2Pair points) edges
     projected = map (\(a, b) -> dot a b) v2Pairs
 
+relax :: Space -> Vector Mask -> (Collisions, Vector EntityPhysics) -> (Collisions, Vector EntityPhysics)
+relax space' masks (_, entityP) = (collisions, constrainedPhysics)
+    where 
+    (collisions, entityPhysics') = resolveCollisions space' $ zip masks entityP
+    constrainedPhysics = satisfyConstraints $ zip masks entityPhysics'
+
+resolveCollisions :: Space -> Vector (Mask, EntityPhysics) -> (Collisions, Vector EntityPhysics)
+resolveCollisions space' maskEntityPhysics = undefined
+
 data Shape a = 
     Circle (Point V2 a) a -- center, radius
     | AABB (Point V2 a) a a -- center, halfWidth halfHeight
@@ -255,14 +282,13 @@ data Shape a =
 
 type Space = Vector (Vector Entity)
 
-satisfyConstraints :: Vector (Mask, PhysicsData) -> Vector (Mask, PhysicsData)
-satisfyConstraints input = 
-    map solve input
+satisfyConstraints :: Vector (Mask, EntityPhysics) -> Vector EntityPhysics
+satisfyConstraints input = map solve input
     where
-    solve (mask, physics@(PhysicsData _ _ _ invertedMass' _ position' shape')) =
+    solve (mask, physics) =
         if hasMask mask physicsMask && not (isStatic physics) && not (isTrigger physics)
-        then (mask, satisfyLineConstraints physics)
-        else (mask, physics)
+        then satisfyLineConstraints physics
+        else physics
 
 satisfyLineConstraint :: (Num a , Fractional a) => Shape a -> LineConstraint a -> Shape a
 satisfyLineConstraint (Polygon points edges constraints) (LineConstraint i j restLength) = 
@@ -284,7 +310,7 @@ satisfyLineConstraint (Circle _ _) _ =
 
 --This method assumes the physics data belongs to an entity with physics, and it
 --assumes it isn't static or a trigger
-satisfyLineConstraints :: PhysicsData -> PhysicsData
+satisfyLineConstraints :: EntityPhysics -> EntityPhysics
 satisfyLineConstraints physics = case shape physics of
     (Circle _ _) -> physics
     (AABB _ _ _) -> physics
@@ -313,11 +339,11 @@ sin45 = sqrt 2 / 2
 -- >>> toBucket 10 10 100 $ V2 50 10
 -- 15
 toBucket :: (RealFrac a, Floating a) => Int -> Int -> Int -> V2 a -> Int
-toBucket bucketWidth bucketHeight mapWidth (V2 x y) = 
-    floor $ left + right
+toBucket bucketWidth bucketHeight mapWidth (V2 x y) = floor $ left + right
     where
     left = x / fromIntegral bucketWidth
-    right = fromIntegral (floor (y / fromIntegral bucketHeight)) * fromIntegral mapWidth / fromIntegral bucketWidth
+    adjustedWidth = fromIntegral mapWidth / fromIntegral bucketWidth
+    right = fromIntegral ((floor (y / fromIntegral bucketHeight)) :: Int) * adjustedWidth
 
 -- | This method will return a vector of all the buckets a shape overlaps.
 toBuckets :: (Floating a, RealFrac a) => Int -> Int -> Int -> Shape a -> Vector Int
@@ -381,16 +407,16 @@ toBuckets bucketWidth bucketHeight mapWidth polygon@(Polygon _ _ _) = buckets
          (southEastPoint, southEastAABB)]
     buckets = map (toBucket bucketWidth bucketHeight mapWidth . pointToV2 . fst) pairs
 
-verletIntegration :: Double -> Vector (Mask, PhysicsData) -> Vector (Mask, PhysicsData)
+verletIntegration :: Double -> Vector (Mask, EntityPhysics) -> Vector EntityPhysics
 verletIntegration tick input = map integrate input
     where
-    integrate (mask, physics@(PhysicsData force' isStatic' 
+    integrate (mask, physics@(EntityPhysics force' isStatic' 
         _ invertedMass' oldPosition' position' _)) = 
 
         if hasMask mask physicsMask && not isStatic'
-        then  (mask, physics{ 
+        then  physics{ 
             oldPosition = position',
             position = 2 *^ position' - oldPosition' + 
                 (force' ^* invertedMass') ^* tick ** 2
-            })
-        else (mask, physics)
+            }
+        else physics
