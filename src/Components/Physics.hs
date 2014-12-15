@@ -19,6 +19,7 @@ import qualified Data.Set as Set
 import Data.Vector as Vector
 import qualified Data.Vector.Algorithms.AmericanFlag as AF
 import Linear.Affine
+import Linear.Epsilon
 import Linear.Metric hiding (project)
 import Linear.V2
 import Linear.Vector
@@ -244,24 +245,47 @@ type PointIndex = Int
 pointToV2 ::  Point V2 a -> V2 a
 pointToV2 (P a) = a
 
---TODO this function needs to be throughly tested, as it's certainly wrong in
---some cases
-project :: (Ord a, Num a) => V2 a -> Shape a -> (a, a)
-project axis (Circle _ radius) = ((-radius), radius)
---TODO: this is almost surely wrong
+-- | This method projects a shape onto an axis and returns the start and end on
+-- that axis.
+-- >>> project (V2 0 1) $ Polygon (fromList [P (V2 1 1), P (V2 2 1), P (V2 1.5 2)]) empty  empty
+-- (1.0,2.0)
+-- >>> project (V2 1 0) $ Polygon (fromList [P (V2 1 1), P (V2 2 1), P (V2 1.5 2)]) empty  empty
+-- (1.0,2.0)
+-- >>> project (V2 1 1) $ Polygon (fromList [P (V2 1 1), P (V2 2 1), P (V2 1.5 2)]) empty  empty
+-- (1.414213562373095,2.474873734152916)
+-- >>> project (V2 0 1) (Circle (P (V2 1 1)) 1)
+-- (0.0,2.0)
+-- >>> project (V2 1 0) (Circle (P (V2 1 1)) 1)
+-- (0.0,2.0)
+-- >>> project (V2 1 1) (Circle (P (V2 1 1)) 1)
+-- (0.4142135623730949,2.414213562373095)
+-- >>> project (V2 0 1) (AABB (P (V2 2 2)) 1 1)
+-- (1.0,3.0)
+-- >>> project (V2 1 0) (AABB (P (V2 2 2)) 1 1)
+-- (1.0,3.0)
+-- >>> project (V2 1 1) (AABB (P (V2 2 2)) 1 1)
+-- (1.414213562373095,4.242640687119285)
+project :: (Ord a, Num a, Floating a, Epsilon a) => V2 a -> Shape a -> (a, a)
+project axis (Circle center radius) = (c - radius, c + radius)
 --http://board.flashkit.com/board/showthread.php?787281-Separating-Axis-Theorem
-project axis (AABB center@(P cV2@(V2 x y)) halfWidth halfHeight) = ((b - r), b + r)
---http://en.wikipedia.org/wiki/Bounding_volume#Basic_intersection_checks
-  where
-  r = halfWidth * abs x + halfHeight * abs y
-  --TODO I'm not sure whether x and y should be absolute valued or get the
-  --magnitude of center
-  b = dot cV2 axis
-project axis (Polygon points edges _) = ((minimum projected), maximum projected)
---http://www.codezealot.org/archives/55
     where
-    v2Pairs = map (edgeToV2Pair points) edges
-    projected = map (\(a, b) -> dot a b) v2Pairs
+    normalizedAxis = normalize axis
+    c = dot (pointToV2 center) normalizedAxis
+project axis (AABB (P center) halfWidth halfHeight) = ((b - r), b + r)
+--http://en.wikipedia.org/wiki/Bounding_volume#Basic_intersection_checks
+    where
+    normalizedAxis@(V2 x y) = normalize axis
+    r = halfWidth * abs x + halfHeight * abs y
+    --TODO I'm not sure whether x and y should be absolute valued or get the
+    --magnitude of center
+    b = dot center normalizedAxis
+project axis (Polygon points _ _) = (minimum projected, maximum projected)
+--http://www.codezealot.org/archives/55
+--"Projecting a shape onto an axis"
+    where
+    v2s = map pointToV2 points
+    normalizedAxis = normalize axis
+    projected = map (\ a -> dot a normalizedAxis) v2s
 
 relax :: Space -> Vector Mask -> (Collisions, Vector EntityPhysics) -> (Collisions, Vector EntityPhysics)
 relax space' masks (_, entityP) = (collisions, constrainedPhysics)
