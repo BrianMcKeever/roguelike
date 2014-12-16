@@ -227,6 +227,11 @@ integrateShape tick (Polygon oldPoints points edges constraints) force' inverted
     integrate (oldPoint, point) = integratePoint tick force' invertedMass' oldPoint point
     points' = map integrate $ zip oldPoints points
 
+-- | Returns true if the pairs overlap. Otherwise, false.
+-- overlaps (1,4) (10,22)
+-- False
+-- overlaps (1,14) (10,22)
+-- True
 overlaps :: (Num a, Ord a) => (a, a) -> (a, a) -> Bool
 overlaps a b = isJust $ getDisplacement a b
 
