@@ -168,6 +168,33 @@ getCircleSeparatingAxis (Circle _ center _) (Polygon _ points _ _) = circleAxis
     circleAxis = perp v2
 getCircleSeparatingAxis _ _ = error "getCircleSeparatingAxis should only be called with a circle and a polygon (in that order)"
 
+-- | This returns the minimum distance needed to separate the pairs on the axis.
+-- >>> getDisplacement (0, 3) (3, 5)
+-- Nothing
+-- >>> getDisplacement (4, 5) (0, 4)
+-- Nothing
+-- >>> getDisplacement (1, 3) (2, 4)
+-- Just 1
+-- >>> getDisplacement (2, 4) (1, 3)
+-- Just 1
+-- >>> getDisplacement (1, 5) (2, 3)
+-- Just 2
+-- >>> getDisplacement (2, 3) (1, 5)
+-- Just 2
+getDisplacement :: (Num a, Ord a) => (a, a) -> (a, a) -> Maybe a
+getDisplacement (min1, max1) (min2, max2) = do
+    --I tried to find a way to do this with less comparisons, but I failed
+    when (max1 <= min2) Nothing
+    when (max2 <= min1) Nothing
+    if | min1 < min2 && max1 < max2 -> return $ max1 - min2
+       -- 1 overlaps from left 
+       | min2 < min1 && max2 < max1 -> return $ max2 - min1
+       --2 overlaps from left 
+       | min1 <= min2 && max2 <= max1 -> return $ max2 - min2 + (min (min2 - min1) $ max1 - max2)
+       --2 is contained by 1 
+       | otherwise -> return $ max1 - min1 + (min (min1 - min2) $ max2 - max1)
+       --1 is contained by 2
+
 getPolygonSeparatingAxis :: Num a => Shape a -> Vector (V2 a)
 getPolygonSeparatingAxis (Polygon _ points edges _) = map (edgeToAxis points) edges
 getPolygonSeparatingAxis _ = error "getPolygonSeparatingAxis should only be called with polygons"
@@ -183,20 +210,6 @@ initialPhysics = Physics (replicate maxEntities d) Set.empty Set.empty Set.empty
 -- Because Haskell can't reference the points directly, we are storing ghetto
 -- references - the indexes of the points.
 data LineConstraint a = LineConstraint PointIndex PointIndex a -- distance 
-
-getOverlap :: (Num a, Ord a) => (a, a) -> (a, a) -> Maybe a
-getOverlap (min1, max1) (min2, max2) = do
-    --I tried to find a way to do this with less comparisons, but I failed
-    when (max1 <= min2) Nothing
-    when (max2 <= min1) Nothing
-    if | min1 < min2 && max1 < max2 -> return $ max1 - min2
-       -- 1 overlaps from left 
-       | min2 < min1 && max2 < max1 -> return $ max2 - min1
-       --2 overlaps from left 
-       | min1 <= min2 && max2 <= max1 -> return $ min2 + max2 + (min (min2 - min1) $ max1 - max2)
-       --2 is contained by 1 
-       | otherwise -> return $ min1 + max1 + (min (min1 - min2) $ max1 - max1)
-       --1 is contained by 2
 
 -- This integrates the point using verletIntegration and returns newPoint.
 integratePoint :: (Floating a, Num a) => a -> V2 a -> a -> Point V2 a -> Point V2 a -> Point V2 a
@@ -215,7 +228,7 @@ integrateShape tick (Polygon oldPoints points edges constraints) force' inverted
     points' = map integrate $ zip oldPoints points
 
 overlaps :: (Num a, Ord a) => (a, a) -> (a, a) -> Bool
-overlaps a b = isJust $ getOverlap a b
+overlaps a b = isJust $ getDisplacement a b
 
 data Physics = Physics {
     entityPhysics :: (Vector EntityPhysics),
