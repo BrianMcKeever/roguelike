@@ -8,7 +8,8 @@ module EntityComponentSystem (
     maskHas,
     Mask,
     Masks,
-    maxEntities
+    maxEntities,
+    unnessary
 )
 where
 import Data.Bits
@@ -49,3 +50,6 @@ type Masks = Vector.Vector Mask
 
 maxEntities :: Int
 maxEntities = 3000
+
+unnessary :: a
+unnessary = error "an argument that was expected to be unecessary was evaluated"
