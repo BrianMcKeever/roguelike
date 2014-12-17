@@ -10,7 +10,7 @@ module Components.Physics (
     Shape(..)
 )
 where
-import Control.Monad
+import Control.Monad hiding (sequence)
 import Control.Monad.ST
 import EntityComponentSystem
 import qualified Data.List as List
@@ -23,7 +23,7 @@ import Linear.Epsilon
 import Linear.Metric hiding (project)
 import Linear.V2
 import Linear.Vector
-import Prelude as Prelude hiding ((++), concat, filter, foldl, last, length, map, maximum, minimum, replicate, span, sum, unzip, zip) 
+import Prelude as Prelude hiding ((++), concat, filter, foldl, init, last, length, map, maximum, minimum, replicate, sequence, span, sum, unzip, zip) 
 import Debug.Trace
 
 newtype BucketIndexEntity = BucketIndexEntity (Int, Entity)
@@ -57,15 +57,24 @@ bucketize gridSize xs = unfoldrN gridSize generate' (0, unwrapped)
         (matching, remaining) = span ((==) a . fst) b
         next = map snd matching
 
-type Collision = (Entity, Entity) 
--- A collision between a and b. a < b
+-- | Entity a, entity b, minimum displacement, minimum displacement axis. A < B
+data Collision = Collision Entity Entity Double (V2 Double)
+    deriving (Show, Eq)
+
+instance Ord Collision where
+    compare (Collision a1 b1 _ _) (Collision a2 b2 _ _) = let
+        firstCompare = compare a1 a2
+        result = case firstCompare of
+            EQ -> compare b1 b2
+            otherwise -> firstCompare
+        in result
 
 type Collisions = Set.Set Collision
 
-createCollision :: Entity -> Entity -> Collision
-createCollision a b 
-    | a < b     = (a, b)
-    | otherwise = (b, a)
+createCollision :: Entity -> Entity -> Double -> V2 Double -> Collision
+createCollision a b displacement axis
+    | a < b     = Collision a b displacement axis
+    | otherwise = Collision b a displacement axis
 
 createSpace :: Int -> 
     Int ->
@@ -81,6 +90,9 @@ createSpace bucketWidth bucketHeight mapHeight mapWidth input = result
                         | otherwise = empty
     result = bucketize (mapHeight * mapWidth) $ foldl' (++) empty bucketEntity
 
+detailedCollision :: (Ord a, Floating a) => Shape a -> Shape a -> Maybe Collision
+detailedCollision = undefined
+
 detailedCollisionCheck :: (Ord a, Floating a) => Shape a -> Shape a -> Bool
 detailedCollisionCheck (Circle _ (P pos1) radius1) (Circle _ (P pos2) radius2) = 
     (radius1 + radius2)**2 > qdA pos1 pos2
@@ -88,8 +100,7 @@ detailedCollisionCheck (Circle _ (P (V2 x1 y1)) radius) (AABB _ (P (V2 x2 y2)) h
     where
     xDifference = abs(x1 - x2)
     yDifference = abs(y1 - y2)
-    cornerDistanceSquared = 
-        (xDifference - halfWidth)**2 + (yDifference - halfHeight) ** 2
+    cornerDistanceSquared = (xDifference - halfWidth)**2 + (yDifference - halfHeight) ** 2
     result = 
         if | xDifference > (halfWidth + radius) -> False
            | yDifference > (halfHeight + radius) -> False
@@ -120,6 +131,7 @@ detailedCollisionCheck a@(AABB _ _ _ _ ) p@(Polygon _ _ _ _) = detailedCollision
 detailedCollisionCheck (Polygon _ _ _ _) p@(Polygon _ _ _ _) = undefined
 
 data Edge = Edge PointIndex PointIndex 
+    deriving (Show)
 --Edges are really non-parallel edges.
 --We can't reference the point directly because this is Haskell. Instead, we are
 --saving the vector indexes of the points that form the edges of our object.
@@ -137,6 +149,21 @@ data EntityPhysics = EntityPhysics {
     invertedMass :: Double,
     shape :: Shape Double
     }
+
+gatherCollisions :: Vector EntityPhysics -> Vector Entity -> Collisions
+gatherCollisions physics' entities' = ifoldl' collide Set.empty $ init entities'
+    where
+    len = length entities'
+
+    collide :: Collisions -> Int -> Entity -> Collisions
+    collide collisions i entity = foldl' (f entity) Set.empty $ slice (i + 1) len entities'
+
+    f :: Entity -> Collisions -> Entity -> Collisions
+    f entity1 collisions' entity2 = 
+        let maybeCollision = detailedCollision (shape $ physics' ! fromIntegral entity1) (shape $ physics' ! fromIntegral entity2) in
+        if isNothing maybeCollision
+        then collisions'
+        else Set.insert (fromJust maybeCollision) collisions'
 
 getAABBSeparatingAxis :: Num a => Vector (V2 a)
 getAABBSeparatingAxis = fromList [V2 0 1, V2 1 0]
@@ -210,6 +237,7 @@ initialPhysics = Physics (replicate maxEntities d) Set.empty Set.empty Set.empty
 -- Because Haskell can't reference the points directly, we are storing ghetto
 -- references - the indexes of the points.
 data LineConstraint a = LineConstraint PointIndex PointIndex a -- distance 
+    deriving (Show)
 
 -- This integrates the point using verletIntegration and returns newPoint.
 integratePoint :: (Floating a, Num a) => a -> V2 a -> a -> Point V2 a -> Point V2 a -> Point V2 a
@@ -260,7 +288,7 @@ physicsUpdate bucketWidth bucketHeight mapWidth mapHeight numberRelaxations tick
     where
     integratedPhysics = verletIntegration tick $ zip masks $ entityPhysics physics
     space' = createSpace bucketWidth bucketHeight mapHeight mapWidth $ zip masks integratedPhysics
-    (collisions, onceRelaxedPhysics) = resolveCollisions space' $ zip masks integratedPhysics
+    (collisions, onceRelaxedPhysics) = resolveCollisions space' integratedPhysics
     oldCollisions = remainingCollisions physics
     newCollisions' = Set.difference collisions oldCollisions
 
@@ -277,6 +305,14 @@ type PointIndex = Int
 
 pointToV2 ::  Point V2 a -> V2 a
 pointToV2 (P a) = a
+
+processCollisions :: Collisions -> Vector EntityPhysics -> Vector EntityPhysics
+processCollisions collisions physics = runST $ do
+    thawed <- thaw physics
+    sequence $ map processCollision $ fromList $ Set.toList collisions
+    freeze thawed
+    where
+    processCollision (Collision entity1 entity2 displacement axis) = undefined
 
 -- | This method projects a shape onto an axis and returns the start and end on
 -- that axis.
@@ -323,11 +359,15 @@ project axis (Polygon _ points _ _) = (minimum projected, maximum projected)
 relax :: Space -> Vector Mask -> (Collisions, Vector EntityPhysics) -> (Collisions, Vector EntityPhysics)
 relax space' masks (_, entityP) = (collisions, constrainedPhysics)
     where 
-    (collisions, entityPhysics') = resolveCollisions space' $ zip masks entityP
+    (collisions, entityPhysics') = resolveCollisions space' entityP
     constrainedPhysics = satisfyConstraints $ zip masks entityPhysics'
 
-resolveCollisions :: Space -> Vector (Mask, EntityPhysics) -> (Collisions, Vector EntityPhysics)
-resolveCollisions space' maskEntityPhysics = undefined
+resolveCollisions :: Space -> Vector EntityPhysics -> (Collisions, Vector EntityPhysics)
+resolveCollisions space' physics = (combinedCollisions, newPhysics)
+    where
+    collisions = map (gatherCollisions physics) space'
+    combinedCollisions = foldl' (\c cs -> Set.union c cs) Set.empty collisions
+    newPhysics = processCollisions combinedCollisions physics
 
 data Shape a = 
     Circle (Point V2 a) (Point V2 a) a -- oldCenter, center, radius
@@ -337,6 +377,7 @@ data Shape a =
               (Vector Edge) 
               (Vector (LineConstraint a)) 
     --  Complex Point (Vector Shape) (Vector ComplexLineConstraint)
+    deriving (Show)
 
 type Space = Vector (Vector Entity)
 
@@ -348,19 +389,35 @@ satisfyConstraints input = map solve input
         then satisfyLineConstraints physics
         else physics
 
-satisfyLineConstraint :: (Num a , Fractional a) => Shape a -> LineConstraint a -> Shape a
+-- | satisfyLineConstraint will make sure one line constraint is enforced on a
+-- shape.
+-- >>> satisfyLineConstraint (Polygon empty (fromList [P (V2 1.0 0.0), P (V2 2.0 0.0)]) empty empty) (LineConstraint 0 1 1.0)
+-- Polygon (fromList []) (fromList [P (V2 1.0 0.0),P (V2 2.0 0.0)]) (fromList []) (fromList [])
+-- >>> satisfyLineConstraint (Polygon empty (fromList [P (V2 1.0 0.0), P (V2 2.0 0.0)]) empty empty) (LineConstraint 0 1 2.0)
+-- Polygon (fromList []) (fromList [P (V2 0.5 0.0),P (V2 2.5 0.0)]) (fromList []) (fromList [])
+satisfyLineConstraint :: (Num a, Floating a, Fractional a) => Shape a -> LineConstraint a -> Shape a
 satisfyLineConstraint (Polygon oldPoints' points edges constraints) (LineConstraint i j restLength) = 
     Polygon oldPoints' points' edges constraints
     where
+    --This is explained in Advanced Character Physics by Thomas Jakobsen
     a = points ! i
     b = points ! j
-    delta = (a ^-^ b) 
-    restLengthSquared = restLength * restLength
-    delta' = delta ^* 
-        (restLengthSquared/(dot delta delta + restLengthSquared) - 0.5)
-    a' = a + delta'
-    b' = b - delta'
+    delta = (b ^-^ a) 
+    deltaLength = sqrt (dot delta delta)
+    difference = (deltaLength - restLength) / deltaLength
+    adjustment = delta ^* (0.5 * difference)
+    a' = a + adjustment
+    b' = b - adjustment
     points' = points // [(i, a'), (j, b')]
+    --This is the sqrt approximation version explained in Advanced Character
+    --Physics by Thomas Jakobsen, but it should be profiled before replacing the
+    --other since it requires more iterations to get the right answer.
+    --delta = (a ^-^ b) 
+    --restLengthSquared = restLength * restLength
+    --delta' = delta ^* (restLengthSquared/(dot delta delta + restLengthSquared) - 0.5)
+    --a' = a + delta'
+    --b' = b - delta'
+    --points' = points // [(i, a'), (j, b')]
 satisfyLineConstraint (AABB _ _ _ _) _ = 
     error "satisfyLineConstraint should never be called for AABBs"
 satisfyLineConstraint (Circle _ _ _) _ = 
