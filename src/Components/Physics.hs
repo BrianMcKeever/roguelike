@@ -395,7 +395,7 @@ satisfyConstraints input = map solve input
 -- Polygon (fromList []) (fromList [P (V2 1.0 0.0),P (V2 2.0 0.0)]) (fromList []) (fromList [])
 -- >>> satisfyLineConstraint (Polygon empty (fromList [P (V2 1.0 0.0), P (V2 2.0 0.0)]) empty empty) (LineConstraint 0 1 2.0)
 -- Polygon (fromList []) (fromList [P (V2 0.5 0.0),P (V2 2.5 0.0)]) (fromList []) (fromList [])
-satisfyLineConstraint :: (Num a, Floating a, Fractional a) => Shape a -> LineConstraint a -> Shape a
+satisfyLineConstraint :: (Epsilon a, Num a, Floating a, Fractional a) => Shape a -> LineConstraint a -> Shape a
 satisfyLineConstraint (Polygon oldPoints' points edges constraints) (LineConstraint i j restLength) = 
     Polygon oldPoints' points' edges constraints
     where
@@ -408,7 +408,9 @@ satisfyLineConstraint (Polygon oldPoints' points edges constraints) (LineConstra
     adjustment = delta ^* (0.5 * difference)
     a' = a + adjustment
     b' = b - adjustment
-    points' = points // [(i, a'), (j, b')]
+    points' = if nearZero delta 
+        then points
+        else points // [(i, a'), (j, b')]
     --This is the sqrt approximation version explained in Advanced Character
     --Physics by Thomas Jakobsen, but it should be profiled before replacing the
     --other since it requires more iterations to get the right answer.
