@@ -17,6 +17,7 @@ import qualified Data.List as List
 import Data.Maybe
 import qualified Data.Set as Set
 import Data.Vector as Vector
+import qualified Data.Vector.Mutable as MVector
 import qualified Data.Vector.Algorithms.AmericanFlag as AF
 import Linear.Affine
 import Linear.Epsilon
@@ -387,13 +388,48 @@ pointsToSeparatingAxis point1 point2 = perp $ (pointToV2 point1) - (pointToV2 $ 
 pointToV2 ::  Point V2 a -> V2 a
 pointToV2 (P a) = a
 
-processCollisions :: Collisions a -> Vector (EntityPhysics a) -> Vector (EntityPhysics a)
+processCollisions :: (Num a, Fractional a) => Collisions a -> Vector (EntityPhysics a) -> Vector (EntityPhysics a)
 processCollisions collisions physics = runST $ do
     thawed <- thaw physics
-    sequence $ map processCollision $ fromList $ Set.toList collisions
+    sequence $ map (processCollision thawed) $ fromList $ Set.toList collisions
     freeze thawed
     where
-    processCollision (Collision entity1 entity2 displacement axis) = undefined
+    processCollision physics' (Collision entity1 entity2 displacement axis) = result
+        where
+        entityPhysics1 = physics ! fromIntegral entity1
+        entityPhysics2 = physics ! fromIntegral entity2
+        result = 
+            if (not $ isStatic entityPhysics1) && (not $ isStatic entityPhysics2)
+            then let
+                halfDisplacement = displacement * 0.5
+                movementVector1 = axis ^*   halfDisplacement
+                movementVector2 = axis ^* (-halfDisplacement)
+                --TODO we're going to get bit by a pushing them the wrong direction
+                --half the time bug here.
+                shape1 = moveShape (shape entityPhysics1) movementVector1
+                shape2 = moveShape (shape entityPhysics2) movementVector2
+                newEntityPhysics1 = entityPhysics1 {shape = shape1}
+                newEntityPhysics2 = entityPhysics2 {shape = shape2}
+                in
+                MVector.write physics' (fromIntegral entity1) newEntityPhysics1 >> 
+                    MVector.write physics' (fromIntegral entity2) newEntityPhysics2
+            else if isStatic entityPhysics1
+                then let 
+                    movementVector = axis ^* displacement
+                    --TODO we're going to get bit by a pushing them the wrong direction
+                    --half the time bug here.
+                    shape' = moveShape (shape entityPhysics2) movementVector
+                    newEntityPhysics' = entityPhysics2 {shape = shape'}
+                    in
+                    MVector.write physics' (fromIntegral entity2) newEntityPhysics'
+                else let
+                    movementVector = axis ^* displacement
+                    --TODO we're going to get bit by a pushing them the wrong direction
+                    --half the time bug here.
+                    shape' = moveShape (shape entityPhysics1) movementVector
+                    newEntityPhysics' = entityPhysics1 {shape = shape'}
+                    in
+                    MVector.write physics' (fromIntegral entity1) newEntityPhysics'
 
 -- | This method projects a shape onto an axis and returns the start and end on
 -- that axis.
