@@ -38,6 +38,15 @@ instance Ord BucketIndexEntity where
     compare (BucketIndexEntity (a1, _)) (BucketIndexEntity (a2, _)) = 
         compare a1 a2
 
+aabbToPoints :: (Floating a) => Shape a -> Vector (Point V2 a)
+aabbToPoints (AABB _ center halfWidth halfHeight) = fromList [northWest, northEast, southWest, southEast]
+    where
+    northWest = center + P (V2 (-halfWidth)   halfHeight )
+    northEast = center + P (V2 ( halfWidth)   halfHeight )
+    southWest = center + P (V2 (-halfWidth) (-halfHeight))
+    southEast = center + P (V2 ( halfWidth) (-halfHeight))
+aabbToPoints _ = error "aabbToPoints called on something other than aabb"
+
 --This function transforms a vector of (bucketIndex, Entity) into a jagged
 --Vector (Vector Entity) where the index of the enclosing vector corresponds to
 --the bucketIndex
@@ -57,30 +66,44 @@ bucketize gridSize xs = unfoldrN gridSize generate' (0, unwrapped)
         (matching, remaining) = span ((==) a . fst) b
         next = map snd matching
 
+calculateCollisionResult :: (Epsilon a, Ord a, Floating a) => Entity -> Maybe (a, V2 a) -> Entity -> Maybe (a, V2 a) -> Maybe (Collision a)
+calculateCollisionResult entity1 left entity2 right = calculateCollisionResult2 entity1 entity2 maybeOverlapPair
+    where
+    maybeOverlapPair = min left right
+
+calculateCollisionResult2 :: (Epsilon a, Ord a, Floating a) => Entity -> Entity -> Maybe (a, V2 a) -> Maybe (Collision a)
+calculateCollisionResult2 entity1 entity2 maybeOverlapPair =
+    if isJust maybeOverlapPair
+    then let (displacement, axis) = fromJust maybeOverlapPair in
+        Just $ createCollision entity1 entity2 displacement $ normalize axis
+    else Nothing
+
 -- | Entity a, entity b, minimum displacement, minimum displacement axis. A < B
-data Collision = Collision Entity Entity Double (V2 Double)
+data Collision a = Collision Entity Entity a (V2 a)
     deriving (Show, Eq)
 
-instance Ord Collision where
+instance Eq a => Ord (Collision a) where
     compare (Collision a1 b1 _ _) (Collision a2 b2 _ _) = let
-        firstCompare = compare a1 a2
-        result = case firstCompare of
+        firstCompare = compare a1 a2 in 
+        case firstCompare of
             EQ -> compare b1 b2
-            otherwise -> firstCompare
-        in result
+            LT -> firstCompare
+            GT -> firstCompare
 
-type Collisions = Set.Set Collision
+type Collisions a = Set.Set (Collision a)
 
-createCollision :: Entity -> Entity -> Double -> V2 Double -> Collision
+createCollision :: (Ord a, Floating a) => Entity -> Entity -> a -> V2 a -> Collision a
 createCollision a b displacement axis
     | a < b     = Collision a b displacement axis
     | otherwise = Collision b a displacement axis
 
-createSpace :: Int -> 
+createSpace :: 
+    (Epsilon a, Floating a, RealFrac a) =>
+    Int -> 
     Int ->
     Int ->
     Int ->
-    Vector (Mask, EntityPhysics) -> 
+    Vector (Mask, EntityPhysics a) -> 
     Space
 createSpace bucketWidth bucketHeight mapHeight mapWidth input = result
     where
@@ -90,10 +113,54 @@ createSpace bucketWidth bucketHeight mapHeight mapWidth input = result
                         | otherwise = empty
     result = bucketize (mapHeight * mapWidth) $ foldl' (++) empty bucketEntity
 
-detailedCollision :: (Ord a, Floating a) => Shape a -> Shape a -> Maybe Collision
-detailedCollision = undefined
+detailedCollision :: (Epsilon a, Floating a, Ord a) => Entity -> Shape a -> Entity -> Shape a -> Maybe (Collision a)
+detailedCollision entity1 circle1@(Circle _ center1 _) entity2 circle2@(Circle _ center2 _) = result
+    where
+    axis = pointsToSeparatingAxis center1 center2
+    maybeOverlap = projectShapes circle1 circle2 axis
+    result = calculateCollisionResult2 entity1 entity2 maybeOverlap
 
-detailedCollisionCheck :: (Ord a, Floating a) => Shape a -> Shape a -> Bool
+detailedCollision entity1 circle@(Circle _ _ _) entity2 aabb@(AABB _ _ _ _) = result
+    where
+    circleAxis = getCircleSeparatingAxis circle aabb
+    maybeCircleOverlapPair = projectShapes circle aabb circleAxis
+    maybeAABBOverlapPair = minimum $ map (projectShapes circle aabb) getAABBSeparatingAxis
+    result = calculateCollisionResult entity1 maybeAABBOverlapPair entity2 maybeCircleOverlapPair
+
+detailedCollision entity1 aabb1@(AABB _ _ _ _) entity2 aabb2@(AABB _ _ _ _) = result
+    where
+    maybeOverlap = minimum $ map (projectShapes aabb1 aabb2) getAABBSeparatingAxis
+    result = calculateCollisionResult2 entity1 entity2 maybeOverlap
+
+detailedCollision entity1 polygon@(Polygon _ _ _ _) entity2 aabb@(AABB _ _ _ _) = result
+    where
+    maybeAABBOverlapPair = minimum $ map (projectShapes polygon aabb) getAABBSeparatingAxis
+    maybeEdgeOverlapPair = minimum $ map (projectShapes polygon aabb) $ getPolygonSeparatingAxis polygon
+    result = calculateCollisionResult entity1 maybeAABBOverlapPair entity2 maybeEdgeOverlapPair
+
+detailedCollision entity1 polygon@(Polygon _ _ _ _) entity2 circle@(Circle _ _ _) = result
+    where
+    circleAxis = getCircleSeparatingAxis circle polygon
+    maybeCircleOverlapPair = projectShapes polygon circle circleAxis
+    maybeEdgeOverlapPair = minimum $ map (projectShapes polygon circle) $ getPolygonSeparatingAxis polygon
+    result = calculateCollisionResult entity1 maybeCircleOverlapPair entity2 maybeEdgeOverlapPair
+
+detailedCollision entity1 polygon1@(Polygon _ _ _ _) entity2 polygon2@(Polygon _ _ _ _) = result
+    where
+    maybeEdgeOverlapPair1 = minimum $ map (projectShapes polygon1 polygon2) $ getPolygonSeparatingAxis polygon1
+    maybeEdgeOverlapPair2 = minimum $ map (projectShapes polygon1 polygon2) $ getPolygonSeparatingAxis polygon2
+    result = calculateCollisionResult entity1 maybeEdgeOverlapPair1 entity2 maybeEdgeOverlapPair2
+
+detailedCollision entity1 aabb@(AABB _ _ _ _) entity2 circle@(Circle _ _ _) = 
+    detailedCollision entity2 circle entity1 aabb
+
+detailedCollision entity1 circle@(Circle _ _ _) entity2 polygon@(Polygon _ _ _ _) =
+    detailedCollision entity2 polygon entity1 circle
+
+detailedCollision entity1 aabb@(AABB _ _ _ _) entity2 polygon@(Polygon _ _ _ _) =
+    detailedCollision entity2 polygon entity1 aabb
+
+detailedCollisionCheck :: (Epsilon a, Ord a, Floating a) => Shape a -> Shape a -> Bool
 detailedCollisionCheck (Circle _ (P pos1) radius1) (Circle _ (P pos2) radius2) = 
     (radius1 + radius2)**2 > qdA pos1 pos2
 detailedCollisionCheck (Circle _ (P (V2 x1 y1)) radius) (AABB _ (P (V2 x2 y2)) halfWidth halfHeight) = result
@@ -110,25 +177,14 @@ detailedCollisionCheck (Circle _ (P (V2 x1 y1)) radius) (AABB _ (P (V2 x2 y2)) h
 detailedCollisionCheck a@(AABB _ _ _ _) c@(Circle _ _ _) = detailedCollisionCheck c a
 detailedCollisionCheck (AABB _ (P (V2 x1 y1)) halfWidth1 halfHeight1) (AABB _ (P (V2 x2 y2)) halfWidth2 halfHeight2) =
         (abs(x1 - x2) < (halfWidth1 + halfWidth2)) && (abs(y1 - y2) < (halfHeight1 + halfHeight2))
-detailedCollisionCheck polygon@(Polygon _ _ _ _) circle@(Circle _ _ _) = result
-    where
-    {-
-    maybeResult = do
-        let circleAxis = getCircleSeparatingAxis circle polygon
-        let shadow1 = project circle circleAxis
-        let shadow2 = project polygon circleAxis
-        overlap shadow1 shadow2
-        -}
-        
-    --getAxis circle
-    --project shapes onto axis
-    --if overlap == false, we're done
-    --getAxis polygon
-    result = undefined
+detailedCollisionCheck polygon@(Polygon _ _ _ _) circle@(Circle _ _ _) = 
+    isJust $ detailedCollision unnessary polygon unnessary circle
 detailedCollisionCheck c@(Circle _ _ _) p@(Polygon _ _ _ _) = detailedCollisionCheck p c
-detailedCollisionCheck (Polygon _ _ _ _) (AABB _ _ _ _ ) = undefined
+detailedCollisionCheck p@(Polygon _ _ _ _) a@(AABB _ _ _ _ ) = 
+    isJust $ detailedCollision unnessary p unnessary a
 detailedCollisionCheck a@(AABB _ _ _ _ ) p@(Polygon _ _ _ _) = detailedCollisionCheck p a
-detailedCollisionCheck (Polygon _ _ _ _) p@(Polygon _ _ _ _) = undefined
+detailedCollisionCheck p1@(Polygon _ _ _ _) p2@(Polygon _ _ _ _) = 
+    isJust $ detailedCollision unnessary p1 unnessary p2
 
 data Edge = Edge PointIndex PointIndex 
     deriving (Show)
@@ -137,30 +193,30 @@ data Edge = Edge PointIndex PointIndex
 --saving the vector indexes of the points that form the edges of our object.
 
 edgeToAxis :: Num a => Vector (Point V2 a) -> Edge -> V2 a
-edgeToAxis points (Edge i j) = perp $ (pointToV2 $ points ! i) - (pointToV2 $ points ! j) 
+edgeToAxis points (Edge i j) = pointsToSeparatingAxis (points ! i)  $ points ! j 
 
 edgeToV2Pair :: Num a => Vector (Point V2 a) -> Edge -> (V2 a, V2 a)
 edgeToV2Pair points (Edge i j) = (pointToV2 $ points ! i, pointToV2 $ points ! j)
 
-data EntityPhysics = EntityPhysics {
-    force :: V2 Double,
+data EntityPhysics a = EntityPhysics {
+    force :: V2 a,
     isStatic :: Bool, 
     isTrigger :: Bool, 
-    invertedMass :: Double,
-    shape :: Shape Double
+    invertedMass :: a,
+    shape :: Shape a
     }
 
-gatherCollisions :: Vector EntityPhysics -> Vector Entity -> Collisions
+gatherCollisions :: (Epsilon a, Eq a, Floating a, Ord a) => Vector (EntityPhysics a) -> Vector Entity -> Collisions a
 gatherCollisions physics' entities' = ifoldl' collide Set.empty $ init entities'
     where
     len = length entities'
 
-    collide :: Collisions -> Int -> Entity -> Collisions
-    collide collisions i entity = foldl' (f entity) Set.empty $ slice (i + 1) len entities'
+    --collide :: Collisions a -> Int -> Entity -> Collisions a
+    collide collisions i entity = foldl' (f entity) collisions $ slice (i + 1) len entities'
 
-    f :: Entity -> Collisions -> Entity -> Collisions
+    --f :: Entity -> Collisions a -> Entity -> Collisions a
     f entity1 collisions' entity2 = 
-        let maybeCollision = detailedCollision (shape $ physics' ! fromIntegral entity1) (shape $ physics' ! fromIntegral entity2) in
+        let maybeCollision = detailedCollision entity1 (shape $ physics' ! fromIntegral entity1) entity2 (shape $ physics' ! fromIntegral entity2) in
         if isNothing maybeCollision
         then collisions'
         else Set.insert (fromJust maybeCollision) collisions'
@@ -188,12 +244,22 @@ getCenterOfBucket bucketWidth bucketHeight (P (V2 x y)) = P (V2 (startX + halfWi
     halfWidth = fromIntegral bucketWidth / 2
     halfHeight = fromIntegral bucketHeight / 2
 
-getCircleSeparatingAxis :: (Ord a, Num a) => Shape a -> Shape a -> V2 a
+getCircleSeparatingAxis :: (Floating a, Ord a, Num a) => Shape a -> Shape a -> V2 a
 getCircleSeparatingAxis (Circle _ center _) (Polygon _ points _ _) = circleAxis
     where
-    (P v2) = fst $ minimumBy (\ (_, a) (_, b) -> compare a b) $ zip points $ map (qdA center) points
+    v2 = pointToV2 $ getClosestPointToCenter center points
     circleAxis = perp v2
-getCircleSeparatingAxis _ _ = error "getCircleSeparatingAxis should only be called with a circle and a polygon (in that order)"
+getCircleSeparatingAxis (Circle _ center _) aabb@(AABB _ _ _ _) = circleAxis
+    where
+    points = aabbToPoints aabb
+    v2 = pointToV2 $ getClosestPointToCenter center points
+    circleAxis = perp v2
+getCircleSeparatingAxis _ _ = 
+    error "getCircleSeparatingAxis should only be called with a circle and a polygon (in that order) or circle and aabb (in that order)"
+
+getClosestPointToCenter :: (Num a, Ord a) => Point V2 a -> Vector (Point V2 a) -> Point V2 a
+getClosestPointToCenter center points = 
+    fst $ minimumBy (\ (_, a) (_, b) -> compare a b) $ zip points $ map (qdA center) points
 
 -- | This returns the minimum distance needed to separate the pairs on the axis.
 -- >>> getDisplacement (0, 3) (3, 5)
@@ -226,7 +292,7 @@ getPolygonSeparatingAxis :: Num a => Shape a -> Vector (V2 a)
 getPolygonSeparatingAxis (Polygon _ points edges _) = map (edgeToAxis points) edges
 getPolygonSeparatingAxis _ = error "getPolygonSeparatingAxis should only be called with polygons"
 
-initialPhysics :: Physics
+initialPhysics :: Physics a
 initialPhysics = Physics (replicate maxEntities d) Set.empty Set.empty Set.empty empty
     where
     d = EntityPhysics unnessary unnessary unnessary unnessary unnessary 
@@ -263,11 +329,11 @@ integrateShape tick (Polygon oldPoints points edges constraints) force' inverted
 overlaps :: (Num a, Ord a) => (a, a) -> (a, a) -> Bool
 overlaps a b = isJust $ getDisplacement a b
 
-data Physics = Physics {
-    entityPhysics :: (Vector EntityPhysics),
-    newCollisions :: Collisions,
-    noLongerCollisions :: Collisions,
-    remainingCollisions :: Collisions,
+data Physics a = Physics {
+    entityPhysics :: (Vector (EntityPhysics a)),
+    newCollisions :: Collisions a,
+    noLongerCollisions :: Collisions a,
+    remainingCollisions :: Collisions a,
     space :: Space
     }
 
@@ -275,15 +341,16 @@ physicsMask :: Mask
 physicsMask = componentToMask PhysicsComponent
 
 physicsUpdate :: 
+    (Epsilon a, Eq a, Floating a, RealFrac a) =>
     Int -> -- bucketWidth
     Int -> -- bucketHeight
     Int -> -- mapWidth
     Int -> -- mapHeight
     Int -> -- numberRelaxations
-    Double -> 
+    a -> 
     Vector Mask -> 
-    Physics -> 
-    Physics 
+    Physics a -> 
+    Physics a
 physicsUpdate bucketWidth bucketHeight mapWidth mapHeight numberRelaxations tick masks physics = physics'
     where
     integratedPhysics = verletIntegration tick $ zip masks $ entityPhysics physics
@@ -303,10 +370,13 @@ physicsUpdate bucketWidth bucketHeight mapWidth mapHeight numberRelaxations tick
 
 type PointIndex = Int
 
+pointsToSeparatingAxis :: Num a => Point V2 a -> Point V2 a -> V2 a
+pointsToSeparatingAxis point1 point2 = perp $ (pointToV2 point1) - (pointToV2 $ point2) 
+
 pointToV2 ::  Point V2 a -> V2 a
 pointToV2 (P a) = a
 
-processCollisions :: Collisions -> Vector EntityPhysics -> Vector EntityPhysics
+processCollisions :: Collisions a -> Vector (EntityPhysics a) -> Vector (EntityPhysics a)
 processCollisions collisions physics = runST $ do
     thawed <- thaw physics
     sequence $ map processCollision $ fromList $ Set.toList collisions
@@ -356,13 +426,20 @@ project axis (Polygon _ points _ _) = (minimum projected, maximum projected)
     normalizedAxis = normalize axis
     projected = map (\ a -> dot a normalizedAxis) v2s
 
-relax :: Space -> Vector Mask -> (Collisions, Vector EntityPhysics) -> (Collisions, Vector EntityPhysics)
+projectShapes :: (Epsilon a, Ord a, Floating a) => Shape a -> Shape a -> V2 a -> Maybe (a, V2 a)
+projectShapes shape1 shape2 axis = fmap (flip (,) axis) $ getDisplacement overlap1 overlap2
+    where
+    overlap1 = project axis shape1
+    overlap2 = project axis shape2
+
+relax :: (Epsilon a, Eq a, Floating a, Fractional a, Ord a) => 
+    Space -> Vector Mask -> (Collisions a, Vector (EntityPhysics a)) -> (Collisions a, Vector (EntityPhysics a))
 relax space' masks (_, entityP) = (collisions, constrainedPhysics)
     where 
     (collisions, entityPhysics') = resolveCollisions space' entityP
     constrainedPhysics = satisfyConstraints $ zip masks entityPhysics'
 
-resolveCollisions :: Space -> Vector EntityPhysics -> (Collisions, Vector EntityPhysics)
+resolveCollisions :: (Epsilon a, Eq a, Floating a, Ord a) => Space -> Vector (EntityPhysics a) -> (Collisions a, Vector (EntityPhysics a))
 resolveCollisions space' physics = (combinedCollisions, newPhysics)
     where
     collisions = map (gatherCollisions physics) space'
@@ -381,7 +458,7 @@ data Shape a =
 
 type Space = Vector (Vector Entity)
 
-satisfyConstraints :: Vector (Mask, EntityPhysics) -> Vector EntityPhysics
+satisfyConstraints :: (Epsilon a, Floating a, Fractional a) => Vector (Mask, EntityPhysics a) -> Vector (EntityPhysics a)
 satisfyConstraints input = map solve input
     where
     solve (mask, physics) =
@@ -427,7 +504,7 @@ satisfyLineConstraint (Circle _ _ _) _ =
 
 --This method assumes the physics data belongs to an entity with physics, and it
 --assumes it isn't static or a trigger
-satisfyLineConstraints :: EntityPhysics -> EntityPhysics
+satisfyLineConstraints :: (Epsilon a, Floating a, Fractional a) => EntityPhysics a -> EntityPhysics a
 satisfyLineConstraints physics = case shape physics of
     (Circle _ _ _) -> physics
     (AABB _ _ _ _) -> physics
@@ -463,7 +540,7 @@ toBucket bucketWidth bucketHeight mapWidth (V2 x y) = floor $ left + right
     right = fromIntegral ((floor (y / fromIntegral bucketHeight)) :: Int) * adjustedWidth
 
 -- | This method will return a vector of all the buckets a shape overlaps.
-toBuckets :: (Floating a, RealFrac a) => Int -> Int -> Int -> Shape a -> Vector Int
+toBuckets :: (Epsilon a, Floating a, RealFrac a) => Int -> Int -> Int -> Shape a -> Vector Int
 toBuckets bucketWidth bucketHeight mapWidth (Circle _ (P center) radius) = result
     --TODO: all these lists and sets could probably be optimized away
     where
@@ -524,7 +601,7 @@ toBuckets bucketWidth bucketHeight mapWidth polygon@(Polygon _ _ _ _) = buckets
          (southEastPoint, southEastAABB)]
     buckets = map (toBucket bucketWidth bucketHeight mapWidth . pointToV2 . fst) pairs
 
-verletIntegration :: Double -> Vector (Mask, EntityPhysics) -> Vector EntityPhysics
+verletIntegration :: (Floating a) => a -> Vector (Mask, EntityPhysics a) -> Vector (EntityPhysics a)
 verletIntegration tick input = map integrate input
     where
     integrate (mask, physics@(EntityPhysics force' isStatic' _ invertedMass' shape')) = 

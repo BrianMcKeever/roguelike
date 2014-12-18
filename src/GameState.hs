@@ -19,7 +19,7 @@ import Tiles
 data GameData = GameData {
     masks :: Masks,
     player :: Entity,
-    physics :: Physics,
+    physics :: Physics Double,
     randomState :: StdGen,
     tiledMap :: TiledMap,
     tiles :: Vector.Vector Picture
