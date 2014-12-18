@@ -321,6 +321,17 @@ integrateShape tick (Polygon oldPoints points edges constraints) force' inverted
     integrate (oldPoint, point) = integratePoint tick force' invertedMass' oldPoint point
     points' = map integrate $ zip oldPoints points
 
+moveShape :: (Num a) => Shape a -> V2 a -> Shape a
+moveShape (Circle oldCenter center radius) movementVector = Circle oldCenter newCenter radius
+    where 
+    newCenter = center + P movementVector
+moveShape (AABB oldCenter center halfWidth halfHeight) movementVector = AABB oldCenter newCenter halfWidth halfHeight
+    where 
+    newCenter = center + P movementVector
+moveShape (Polygon oldPoints points edges constraints) movementVector = Polygon oldPoints newPoints edges constraints
+    where
+    newPoints = map (+ P movementVector) points
+
 -- | Returns true if the pairs overlap. Otherwise, false.
 -- overlaps (1,4) (10,22)
 -- False
