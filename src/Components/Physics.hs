@@ -359,7 +359,7 @@ physicsUpdate ::
     Int -> -- mapWidth
     Int -> -- mapHeight
     Int -> -- numberRelaxations
-    a -> 
+    a ->  -- Tick
     Vector Mask -> 
     Physics a -> 
     Physics a

@@ -33,7 +33,7 @@ createMask = foldl' (\m c -> componentToMask c .|. m) 0
 
 type Entity = Word16
 
---If the first argument contains the second argument, true. Otherwise, false
+--If the first mask contains the second mask, true. Otherwise, false
 hasMask :: Mask -> Mask -> Bool
 hasMask a b = a .&. b == b
 
@@ -52,4 +52,4 @@ maxEntities :: Int
 maxEntities = 3000
 
 unnessary :: a
-unnessary = error "an argument that was expected to be unecessary was evaluated"
+unnessary = error "an argument that was thought unecessary was evaluated"
