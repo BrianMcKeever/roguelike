@@ -2,14 +2,17 @@
 module Components.Physics (
     Collision,
     createCollision,
+    getEntitiesInBox,
     EntityPhysics(..),
     Physics(..),
     physicsMask,
     physicsUpdate,
     initialPhysics,
-    Shape(..)
+    Shape(..),
+    Space
 )
 where
+import Control.Applicative hiding (empty)
 import Control.Monad hiding (sequence)
 import Control.Monad.ST
 import EntityComponentSystem
@@ -25,7 +28,8 @@ import Linear.Metric hiding (project)
 import Linear.V2
 import Linear.Vector
 import Prelude as Prelude hiding ((++), concat, filter, foldl, init, last, length, map, maximum, minimum, replicate, sequence, span, sum, unzip, zip) 
-import Debug.Trace
+import Vector
+--import Debug.Trace
 
 newtype BucketIndexEntity = BucketIndexEntity (Int, Entity)
     deriving (Eq, Show)
@@ -196,8 +200,8 @@ data Edge = Edge PointIndex PointIndex
 edgeToAxis :: Num a => Vector (Point V2 a) -> Edge -> V2 a
 edgeToAxis points (Edge i j) = pointsToSeparatingAxis (points ! i)  $ points ! j 
 
-edgeToV2Pair :: Num a => Vector (Point V2 a) -> Edge -> (V2 a, V2 a)
-edgeToV2Pair points (Edge i j) = (pointToV2 $ points ! i, pointToV2 $ points ! j)
+--edgeToV2Pair :: Num a => Vector (Point V2 a) -> Edge -> (V2 a, V2 a)
+--edgeToV2Pair points (Edge i j) = (pointToV2 $ points ! i, pointToV2 $ points ! j)
 
 data EntityPhysics a = EntityPhysics {
     force :: V2 a,
@@ -289,6 +293,30 @@ getDisplacement (min1, max1) (min2, max2) = do
        | otherwise -> return $ max1 - min1 + (min (min1 - min2) $ max2 - max1)
        --1 is contained by 2
 
+-- | This function will return all of the entites in the box of width displayWidth
+-- displayHeight centered on center.
+getEntitiesInBox :: (Epsilon a, Floating a, Fractional a, Ord a, RealFrac a) 
+    => Int -> Int -> Int -> Physics a -> Int -> Int -> Point V2 a -> Vector Entity
+getEntitiesInBox bucketWidth bucketHeight mapWidth physics displayWidth displayHeight center@(P (V2 centerX centerY)) = result
+    -- Get entities from the possible buckets
+    -- Make AABB
+    -- Test AABB against entities
+    where
+    numberXBuckets = ceiling $ (fromIntegral displayWidth / fromIntegral bucketWidth :: Double) :: Int
+    numberYBuckets = ceiling $ (fromIntegral displayHeight / fromIntegral bucketHeight :: Double) :: Int
+
+    xs = Vector.enumFromStepN (centerX + 0.5 * fromIntegral displayWidth) (fromIntegral bucketWidth) $ fromIntegral numberXBuckets
+    ys = Vector.enumFromStepN (centerY + 0.5 * fromIntegral displayHeight) (fromIntegral (-bucketHeight)) $ fromIntegral numberYBuckets
+    coordinatesInBuckets = flip (V2) <$> ys <*> xs
+    space' = space physics
+    entities = concatVector $ map (\ coordinate -> space' ! toBucket bucketWidth bucketHeight mapWidth coordinate) coordinatesInBuckets
+    entitiesWithoutDuplicates = removeDuplicates entities
+    aabb = AABB unnessary center (fromIntegral displayWidth * 0.5) (fromIntegral displayHeight * 0.5)
+    entityPhysics' = entityPhysics physics
+    result = filter (\entity -> detailedCollisionCheck (shape $ entityPhysics' ! fromIntegral entity) aabb) entitiesWithoutDuplicates
+    --TODO we only need to check the entities in the buckets around the
+    --edges
+
 getPolygonSeparatingAxis :: Num a => Shape a -> Vector (V2 a)
 getPolygonSeparatingAxis (Polygon _ points edges _) = map (edgeToAxis points) edges
 getPolygonSeparatingAxis _ = error "getPolygonSeparatingAxis should only be called with polygons"
@@ -338,8 +366,8 @@ moveShape (Polygon oldPoints points edges constraints) movementVector = Polygon 
 -- False
 -- overlaps (1,14) (10,22)
 -- True
-overlaps :: (Num a, Ord a) => (a, a) -> (a, a) -> Bool
-overlaps a b = isJust $ getDisplacement a b
+--overlaps :: (Num a, Ord a) => (a, a) -> (a, a) -> Bool
+--overlaps a b = isJust $ getDisplacement a b
 
 data Physics a = Physics {
     entityPhysics :: (Vector (EntityPhysics a)),

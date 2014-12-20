@@ -1,5 +1,8 @@
 module Tiles(
     loadTiles,
+    numberHorizontalTiles,
+    numberVerticalTiles,
+    pixelScale,
     renderArea,
     renderTile
 )
@@ -31,6 +34,8 @@ loadTile :: DynamicImage -> Int -> Int -> (Int, Int) -> Picture
 loadTile sheet width height (leftOffset, topOffset) = 
     dynamicToPicture $ crop leftOffset topOffset width height sheet
 
+-- | This loads the images of all of the tiles mentioned in the Tiled TiledMap
+-- into a vector of pictures.
 loadTiles :: Tiled.TiledMap -> IO (Vector.Vector Picture)
 loadTiles tiledMap = do
     let layer = head $ Tiled.mapLayers tiledMap
@@ -39,6 +44,7 @@ loadTiles tiledMap = do
     return $ Vector.map (scale scaleFactor scaleFactor) $ Vector.concat (Vector.singleton Blank : tiles)
     --I'm adding a blank picture on the front because tileGids aren't 0 indexed
 
+-- | This is an intermediate step of loadTiles that loads one tile set.
 loadTileset :: Tiled.Tileset -> IO (Vector.Vector Picture)
 loadTileset tileset = do
     let image = head $ Tiled.tsImages tileset --multiple images arent supported in Data.Tiled yet
@@ -63,7 +69,7 @@ numberVerticalTiles = 2 * sightRangeY + 2
 pixelScale :: Float
 pixelScale = scaleFactor * tileDimension
 
---Returns a picture of the tiles on the screen centered on x,y
+-- | Returns a picture of the tiles on the screen centered on x,y
 renderArea :: Vector.Vector Picture -> Tiled.TiledMap -> (Float, Float) -> Picture
 renderArea tiles tiledMap (x, y) = translate xOffset yOffset $ pictures tilePictures
     where
@@ -76,8 +82,8 @@ renderArea tiles tiledMap (x, y) = translate xOffset yOffset $ pictures tilePict
     xOffset = (-(snd $ (properFraction x :: (Int, Float))) * pixelScale)
     yOffset = (snd $ (properFraction y :: (Int, Float))) * pixelScale
 
---returns a picture of the tile at map coordinate coordinates at xOffset,
---yOffset
+-- | Returns a picture of the tile at map coordinate coordinates at xOffset,
+-- yOffset
 renderTile :: Vector.Vector Picture -> Map.Map (Int, Int) Tiled.Tile -> ((Float, Float), (Int, Int)) -> Picture
 renderTile tilePictures layerData ((xOffset, yOffset), coordinates) = translate xOffset yOffset tilePicture
     where
@@ -99,6 +105,8 @@ sightRangeY = 5
 tileDimension :: Float
 tileDimension = 16
 
+-- | This a vector of the positions of all of the tiles that should be on the
+-- screen.
 tilePositions :: Vector.Vector (Float, Float)
 tilePositions = flip (,) <$> ys <*> xs
     where
