@@ -1,4 +1,5 @@
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Components.Physics (
     Collision,
     createCollision,
@@ -295,15 +296,15 @@ getDisplacement (min1, max1) (min2, max2) = do
 
 -- | This function will return all of the entites in the box of width displayWidth
 -- displayHeight centered on center.
-getEntitiesInBox :: (Epsilon a, Floating a, Fractional a, Ord a, RealFrac a) 
+getEntitiesInBox :: forall a . (Epsilon a, Floating a, Fractional a, Ord a, RealFrac a) 
     => Int -> Int -> Int -> Physics a -> Int -> Int -> Point V2 a -> Vector Entity
 getEntitiesInBox bucketWidth bucketHeight mapWidth physics displayWidth displayHeight center@(P (V2 centerX centerY)) = result
     -- Get entities from the possible buckets
     -- Make AABB
     -- Test AABB against entities
     where
-    numberXBuckets = ceiling $ (fromIntegral displayWidth / fromIntegral bucketWidth :: Double) :: Int
-    numberYBuckets = ceiling $ (fromIntegral displayHeight / fromIntegral bucketHeight :: Double) :: Int
+    numberXBuckets = ceiling $ (fromIntegral displayWidth / fromIntegral bucketWidth :: a) :: Int
+    numberYBuckets = ceiling $ (fromIntegral displayHeight / fromIntegral bucketHeight :: a) :: Int
 
     xs = Vector.enumFromStepN (centerX + 0.5 * fromIntegral displayWidth) (fromIntegral bucketWidth) $ fromIntegral numberXBuckets
     ys = Vector.enumFromStepN (centerY + 0.5 * fromIntegral displayHeight) (fromIntegral (-bucketHeight)) $ fromIntegral numberYBuckets
