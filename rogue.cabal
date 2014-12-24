@@ -5,11 +5,61 @@ maintainer:          keever@gmail.com
 build-type:          Simple
 cabal-version:       >=1.10
 
-executable rogue
-    main-is:             Main.hs
+executable main
+     main-is:             Main.hs
+     build-depends:       base >=4.6,
+        containers,
+        data-ordlist,
+        deepseq,
+        gloss,
+        gloss-game,
+        gloss-juicy,
+        gloss-raster,
+        htiled,
+        JuicyPixels,
+        linear,
+        mtl,
+        random,
+        roguebard,
+        StateVar,
+        unordered-containers,
+        vector,
+        vector-algorithms
+
+     hs-source-dirs:      src
+     default-language:    Haskell2010
+     ghc-options:         -Wall -threaded -O2 -auto-all -rtsopts -caf-all -fno-warn-unused-do-bind
+
+executable profile
+     main-is:             Profile.hs
+     build-depends:       base >=4.6,
+        containers,
+        data-ordlist,
+        deepseq,
+        gloss,
+        gloss-game,
+        gloss-juicy,
+        gloss-raster,
+        htiled,
+        JuicyPixels,
+        linear,
+        mtl,
+        random,
+        roguebard,
+        StateVar,
+        unordered-containers,
+        vector,
+        vector-algorithms
+
+     hs-source-dirs:      src
+     default-language:    Haskell2010
+     ghc-options:         -Wall -threaded -O2 -auto-all -rtsopts -caf-all -fno-warn-unused-do-bind
+
+Library
     build-depends:       base >=4.6,
         containers,
         data-ordlist,
+        deepseq,
         gloss,
         gloss-game,
         gloss-juicy,
@@ -23,12 +73,27 @@ executable rogue
         unordered-containers,
         vector,
         vector-algorithms
+    exposed-modules: 
+                     Components.Physics
+                     Components.Renderable
+                     EntityComponentSystem
+                     GameState
+                     Miscellaneous
+                     Tiles
+                     Vector
     hs-source-dirs:      src
     default-language:    Haskell2010
     ghc-options:         -Wall -threaded -O2 -auto-all -rtsopts -caf-all -fno-warn-unused-do-bind
 
-test-suite doctests
-  type:          exitcode-stdio-1.0
-  ghc-options:   -threaded
-  main-is:       src/doctests.hs
-  build-depends: base, doctest >= 0.8
+Test-Suite spec
+  Type:                 exitcode-stdio-1.0
+  Default-Language:     Haskell2010
+  Hs-Source-Dirs:       Tests
+  Ghc-Options:          -Wall -threaded
+  Main-Is:              Spec.hs
+  Build-Depends:        base
+                      , roguebard
+                      , hspec
+                      , linear
+        ,vector-algorithms
+                      , vector

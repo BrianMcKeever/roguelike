@@ -1,19 +1,24 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module Components.Physics (
+    BucketIndexEntity(..),
     Collision,
     createCollision,
+    createSpace,
     getEntitiesInBox,
+    getDisplacement,
     EntityPhysics(..),
     Physics(..),
     physicsMask,
     physicsUpdate,
     initialPhysics,
     Shape(..),
-    Space
+    Space,
+    toBuckets
 )
 where
 import Control.Applicative hiding (empty)
+import Control.DeepSeq as DeepSeq
 import Control.Monad hiding (sequence)
 import Control.Monad.ST
 import EntityComponentSystem
@@ -22,7 +27,7 @@ import Data.Maybe
 import qualified Data.Set as Set
 import Data.Vector as Vector
 import qualified Data.Vector.Mutable as MVector
-import qualified Data.Vector.Algorithms.AmericanFlag as AF
+import qualified Data.Vector.Algorithms.Intro as Intro
 import Linear.Affine
 import Linear.Epsilon
 import Linear.Metric hiding (project)
@@ -30,15 +35,9 @@ import Linear.V2
 import Linear.Vector
 import Prelude as Prelude hiding ((++), concat, filter, foldl, init, last, length, map, maximum, minimum, replicate, sequence, span, sum, unzip, zip) 
 import Vector
---import Debug.Trace
 
 newtype BucketIndexEntity = BucketIndexEntity (Int, Entity)
     deriving (Eq, Show)
-
-instance AF.Lexicographic BucketIndexEntity where
-    terminate (BucketIndexEntity (a, _)) i = AF.terminate a i
-    size (BucketIndexEntity (a, _)) = AF.size a
-    index i (BucketIndexEntity (a, _)) = AF.index i a
 
 instance Ord BucketIndexEntity where
     compare (BucketIndexEntity (a1, _)) (BucketIndexEntity (a2, _)) = 
@@ -64,7 +63,7 @@ bucketize gridSize xs = unfoldrN gridSize generate' (0, unwrapped)
     wrapped = map BucketIndexEntity xs
     sorted = runST $ do 
         thawed <- thaw wrapped
-        AF.sort thawed
+        Intro.sort thawed
         freeze thawed
     unwrapped = map (\ (BucketIndexEntity (a, b)) -> (a, b)) sorted
     generate' (a, b) = Just (next, (a + 1, remaining))
@@ -96,6 +95,9 @@ instance Eq a => Ord (Collision a) where
             LT -> firstCompare
             GT -> firstCompare
 
+instance NFData (Collision a) where
+    rnf (Collision e1 e2 displacement axis) = rnf (seq e1 (), seq e2 (), seq displacement (), seq axis ())
+
 type Collisions a = Set.Set (Collision a)
 
 createCollision :: (Ord a, Floating a) => Entity -> Entity -> a -> V2 a -> Collision a
@@ -103,8 +105,10 @@ createCollision a b displacement axis
     | a < b     = Collision a b displacement axis
     | otherwise = Collision b a displacement axis
 
+-- | Spaces are vectors of vectors that contain entities that are all within the
+-- same bucket.
 createSpace :: 
-    (Epsilon a, Floating a, RealFrac a) =>
+    forall a . (Epsilon a, Floating a, Num a, RealFrac a) =>
     Int -> 
     Int ->
     Int ->
@@ -117,7 +121,9 @@ createSpace bucketWidth bucketHeight mapHeight mapWidth input = result
     f entity (mask, physics) | hasMask mask physicsMask = 
         map (\bucket -> (bucket, fromIntegral entity)) $ toBuckets bucketWidth bucketHeight mapWidth $ shape physics
                         | otherwise = empty
-    result = bucketize (mapHeight * mapWidth) $ foldl' (++) empty bucketEntity
+    numberXBuckets = ceiling $ ((fromIntegral mapWidth :: a) / fromIntegral bucketWidth)
+    numberYBuckets = ceiling $ (fromIntegral mapHeight :: a) / fromIntegral bucketHeight
+    result = bucketize (numberXBuckets * numberYBuckets) $ foldl' (++) empty bucketEntity
 
 detailedCollision :: (Epsilon a, Floating a, Ord a) => Entity -> Shape a -> Entity -> Shape a -> Maybe (Collision a)
 detailedCollision entity1 circle1@(Circle _ center1 _) entity2 circle2@(Circle _ center2 _) = result
@@ -205,12 +211,15 @@ edgeToAxis points (Edge i j) = pointsToSeparatingAxis (points ! i)  $ points ! j
 --edgeToV2Pair points (Edge i j) = (pointToV2 $ points ! i, pointToV2 $ points ! j)
 
 data EntityPhysics a = EntityPhysics {
-    force :: V2 a,
-    isStatic :: Bool, 
-    isTrigger :: Bool, 
-    invertedMass :: a,
-    shape :: Shape a
+    force :: ! (V2 a),
+    isStatic :: ! Bool, 
+    isTrigger :: ! Bool, 
+    invertedMass :: ! a,
+    shape :: ! (Shape a)
     }
+
+instance NFData (EntityPhysics a) where
+    rnf (EntityPhysics f iS iT iM s) = rnf (seq f (), rnf iS, rnf iT, seq iM (), rnf s)
 
 gatherCollisions :: (Epsilon a, Eq a, Floating a, Ord a) => Vector (EntityPhysics a) -> Vector Entity -> Collisions a
 gatherCollisions physics' entities' = ifoldl' collide Set.empty $ init entities'
@@ -268,18 +277,6 @@ getClosestPointToCenter center points =
     fst $ minimumBy (\ (_, a) (_, b) -> compare a b) $ zip points $ map (qdA center) points
 
 -- | This returns the minimum distance needed to separate the pairs on the axis.
--- >>> getDisplacement (0, 3) (3, 5)
--- Nothing
--- >>> getDisplacement (4, 5) (0, 4)
--- Nothing
--- >>> getDisplacement (1, 3) (2, 4)
--- Just 1
--- >>> getDisplacement (2, 4) (1, 3)
--- Just 1
--- >>> getDisplacement (1, 5) (2, 3)
--- Just 2
--- >>> getDisplacement (2, 3) (1, 5)
--- Just 2
 getDisplacement :: (Num a, Ord a) => (a, a) -> (a, a) -> Maybe a
 getDisplacement (min1, max1) (min2, max2) = do
     --I tried to find a way to do this with less comparisons, but I failed
@@ -296,25 +293,25 @@ getDisplacement (min1, max1) (min2, max2) = do
 
 -- | This function will return all of the entites in the box of width displayWidth
 -- displayHeight centered on center.
-getEntitiesInBox :: forall a . (Epsilon a, Floating a, Fractional a, Ord a, RealFrac a) 
+getEntitiesInBox :: forall a . (Show a, Epsilon a, Floating a, Fractional a, Ord a, RealFrac a) 
     => Int -> Int -> Int -> Physics a -> Int -> Int -> Point V2 a -> Vector Entity
 getEntitiesInBox bucketWidth bucketHeight mapWidth physics displayWidth displayHeight center@(P (V2 centerX centerY)) = result
     -- Get entities from the possible buckets
     -- Make AABB
     -- Test AABB against entities
     where
-    numberXBuckets = ceiling $ (fromIntegral displayWidth / fromIntegral bucketWidth :: a) :: Int
+    numberXBuckets =  ceiling $ (fromIntegral displayWidth / fromIntegral bucketWidth :: a) :: Int
     numberYBuckets = ceiling $ (fromIntegral displayHeight / fromIntegral bucketHeight :: a) :: Int
 
     xs = Vector.enumFromStepN (centerX + 0.5 * fromIntegral displayWidth) (fromIntegral bucketWidth) $ fromIntegral numberXBuckets
     ys = Vector.enumFromStepN (centerY + 0.5 * fromIntegral displayHeight) (fromIntegral (-bucketHeight)) $ fromIntegral numberYBuckets
     coordinatesInBuckets = flip (V2) <$> ys <*> xs
     space' = space physics
-    entities = concatVector $ map (\ coordinate -> space' ! toBucket bucketWidth bucketHeight mapWidth coordinate) coordinatesInBuckets
-    entitiesWithoutDuplicates = removeDuplicates entities
+    entities = concatVector $ map (\ coordinate -> space' ! (toBucket bucketWidth bucketHeight mapWidth coordinate)) coordinatesInBuckets
+    uniqueEntities = removeDuplicates entities
     aabb = AABB unnessary center (fromIntegral displayWidth * 0.5) (fromIntegral displayHeight * 0.5)
     entityPhysics' = entityPhysics physics
-    result = filter (\entity -> detailedCollisionCheck (shape $ entityPhysics' ! fromIntegral entity) aabb) entitiesWithoutDuplicates
+    result = filter (\entity -> detailedCollisionCheck (shape $ entityPhysics' ! fromIntegral entity) aabb) uniqueEntities
     --TODO we only need to check the entities in the buckets around the
     --edges
 
@@ -323,10 +320,9 @@ getPolygonSeparatingAxis (Polygon _ points edges _) = map (edgeToAxis points) ed
 getPolygonSeparatingAxis _ = error "getPolygonSeparatingAxis should only be called with polygons"
 
 initialPhysics :: Physics a
-initialPhysics = Physics (replicate maxEntities d) Set.empty Set.empty Set.empty empty
+initialPhysics = Physics (replicate maxEntities ep) Set.empty Set.empty Set.empty empty
     where
-    d = EntityPhysics unnessary unnessary unnessary unnessary unnessary 
-    --(V2 0 0) False False 0 (V2 0 0) (V2 0 0) (Circle (P (V2 0 0) (P (V2 0 0)) 0)
+    ep = EntityPhysics unnessary unnessary unnessary unnessary unnessary 
 
 -- A LineConstraint is like a stick between 2 points. The physics engine will
 -- try to keep the points the same distance from each other.
@@ -371,12 +367,15 @@ moveShape (Polygon oldPoints points edges constraints) movementVector = Polygon 
 --overlaps a b = isJust $ getDisplacement a b
 
 data Physics a = Physics {
-    entityPhysics :: (Vector (EntityPhysics a)),
-    newCollisions :: Collisions a,
-    noLongerCollisions :: Collisions a,
-    remainingCollisions :: Collisions a,
-    space :: Space
+    entityPhysics :: ! (Vector (EntityPhysics a)),
+    newCollisions :: ! (Collisions a),
+    noLongerCollisions :: ! (Collisions a),
+    remainingCollisions :: ! (Collisions a),
+    space :: ! Space
     }
+
+instance NFData (Physics a) where
+    rnf (Physics ep nc nlc rc s) = rnf (rnf ep, rnf nc, rnf nlc, rnf rc, rnf s)
 
 physicsMask :: Mask
 physicsMask = componentToMask PhysicsComponent
@@ -407,7 +406,7 @@ physicsUpdate bucketWidth bucketHeight mapWidth mapHeight numberRelaxations tick
     (remainingCollisions', entityPhysics') = last $ unfoldrN numberRelaxations maybeRelax (Set.empty, onceRelaxedPhysics)
     noLongerCollisions' = Set.difference oldCollisions remainingCollisions'
 
-    physics' = Physics (entityPhysics') newCollisions' noLongerCollisions' remainingCollisions' space'
+    physics' = Physics (entityPhysics') newCollisions' noLongerCollisions' remainingCollisions' (DeepSeq.force space')
 
 type PointIndex = Int
 
@@ -523,14 +522,17 @@ resolveCollisions space' physics = (combinedCollisions, newPhysics)
     newPhysics = processCollisions combinedCollisions physics
 
 data Shape a = 
-    Circle (Point V2 a) (Point V2 a) a -- oldCenter, center, radius
-    | AABB (Point V2 a) (Point V2 a) a a -- oldCenter, center, halfWidth halfHeight
-    | Polygon (Vector (Point V2 a)) --oldPoints
-              (Vector (Point V2 a)) --points
-              (Vector Edge) 
-              (Vector (LineConstraint a)) 
+    Circle !(Point V2 a) !(Point V2 a) !a -- oldCenter, center, radius
+    | AABB !(Point V2 a) !(Point V2 a) !a !a -- oldCenter, center, halfWidth halfHeight
+    | Polygon !(Vector (Point V2 a)) --oldPoints
+              !(Vector (Point V2 a)) --points
+              !(Vector Edge) 
+              !(Vector (LineConstraint a)) 
     --  Complex Point (Vector Shape) (Vector ComplexLineConstraint)
     deriving (Show)
+
+instance NFData (Shape a) where
+    rnf a = seq a ()
 
 type Space = Vector (Vector Entity)
 
@@ -608,6 +610,10 @@ sin45 = sqrt 2 / 2
 -- 15
 -- >>> toBucket 10 10 100 $ V2 50 10
 -- 15
+-- >>> toBucket 10 10 100 $ V2 50 10
+-- 15
+-- >>> toBucket 1 1 12800 $ V2 352 352
+-- 4505952
 toBucket :: (RealFrac a, Floating a) => Int -> Int -> Int -> V2 a -> Int
 toBucket bucketWidth bucketHeight mapWidth (V2 x y) = floor $ left + right
     where
@@ -630,7 +636,7 @@ toBuckets bucketWidth bucketHeight mapWidth (Circle _ (P center) radius) = resul
     northEast = center + V2 ( orthagonal)   orthagonal
     southWest = center + V2 (-orthagonal) (-orthagonal)
     southEast = center + V2 ( orthagonal) (-orthagonal)
-    result = fromList $ Set.toList $ Set.fromList $ 
+    result = filter (>= 0) $ fromList $ Set.toList $ Set.fromList $ 
         fmap (toBucket bucketWidth bucketHeight mapWidth) [north, south, east, west, northWest, northEast, southWest, southEast]
 toBuckets bucketWidth bucketHeight mapWidth (AABB _ (P center) halfWidth halfHeight) = result
     where
@@ -638,7 +644,7 @@ toBuckets bucketWidth bucketHeight mapWidth (AABB _ (P center) halfWidth halfHei
     northEast = center + V2 ( halfWidth)   halfHeight
     southWest = center + V2 (-halfWidth) (-halfHeight)
     southEast = center + V2 ( halfWidth) (-halfHeight)
-    result = fromList $ Set.toList $ Set.fromList $ 
+    result = filter (>= 0) $ fromList $ Set.toList $ Set.fromList $ 
         fmap (toBucket bucketWidth bucketHeight mapWidth) [northWest, northEast, southWest, southEast]
 toBuckets bucketWidth bucketHeight mapWidth polygon@(Polygon _ _ _ _) = buckets
     --We have to collision test the surrounding 8 buckets to decide which
@@ -675,7 +681,7 @@ toBuckets bucketWidth bucketHeight mapWidth polygon@(Polygon _ _ _ _) = buckets
          (northEastPoint, northEastAABB),
          (southWestPoint, southWestAABB),
          (southEastPoint, southEastAABB)]
-    buckets = map (toBucket bucketWidth bucketHeight mapWidth . pointToV2 . fst) pairs
+    buckets = filter (>= 0) $ map (toBucket bucketWidth bucketHeight mapWidth . pointToV2 . fst) pairs
 
 verletIntegration :: (Floating a) => a -> Vector (Mask, EntityPhysics a) -> Vector (EntityPhysics a)
 verletIntegration tick input = map integrate input

@@ -35,7 +35,7 @@ basicRender zindex tileName _ entity = do
 initialRenderData :: Vector RenderData
 initialRenderData = replicate maxEntities (RenderData Torso Blank)
 
-data RenderData = RenderData ZIndex Picture
+data RenderData = RenderData ! ZIndex ! Picture
 
 instance Eq RenderData where
     (RenderData index1 _) == (RenderData index2 _) = index1 == index2
@@ -43,7 +43,7 @@ instance Eq RenderData where
 instance Ord RenderData where
     compare (RenderData index1 _) (RenderData index2 _) = compare index1 index2
 
-renderEntities :: (Epsilon a, Floating a, Ord a, RealFrac a) => 
+renderEntities :: (Show a, Epsilon a, Floating a, Ord a, RealFrac a) => 
     Int -> Int -> Int -> Physics a -> Masks -> Vector RenderData -> Int -> Int -> Point V2 a -> Picture
 renderEntities bucketWidth bucketHeight mapWidth physics' masks' renderData displayWidth displayHeight center = result
     -- Grab the entities in the buckets covering the screen.

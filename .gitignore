@@ -1,8 +1,8 @@
 .cabal-sandbox
-rogue.aux
-rogue.hp
-rogue.ps
-rogue.prof
+*.aux
+*.hp
+*.ps
+*.prof
 dist
 *.swp
 cabal.sandbox.config

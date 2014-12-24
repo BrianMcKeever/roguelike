@@ -6,6 +6,7 @@ module GameState (
 where
 import Components.Physics
 import Components.Renderable
+import Control.DeepSeq
 import Control.Monad.State.Lazy
 --import qualified Data.Map.Lazy as Map
 --import qualified Data.Set as Set
@@ -18,14 +19,18 @@ import System.Random
 import Tiles
 
 data GameData = GameData {
-    masks :: Masks,
-    player :: Entity,
-    physics :: Physics Double,
-    randomState :: StdGen,
-    renderData :: Vector.Vector RenderData,
-    tiledMap :: TiledMap,
-    tiles :: Vector.Vector Picture
+    masks :: ! Masks,
+    player :: ! Entity,
+    physics :: ! (Physics Double),
+    randomState :: ! StdGen,
+    renderData :: ! (Vector.Vector RenderData),
+    tiledMap :: ! TiledMap,
+    tiles :: ! (Vector.Vector Picture)
     }
+
+instance NFData GameData where
+    rnf (GameData masks' player' physics' randomState' renderData' tiledMap' tiles') = 
+        rnf (rnf masks', rnf player', rnf physics', seq randomState' (), seq renderData' (), seq tiledMap' (), seq tiles' ())
 
 type GameState = State GameData
 
@@ -33,6 +38,7 @@ initialGameData :: IO GameData
 initialGameData = do
     mapFile <- loadMapFile "assets/tile_map.tmx"
     tiles' <- loadTiles mapFile
+
     return GameData {
         masks = initialMasks,
         physics = initialPhysics,
