@@ -1,3 +1,4 @@
+import Components.Physics
 import Game
 import GameState
 import Miscellaneous
@@ -6,7 +7,8 @@ import qualified Control.DeepSeq as DeepSeq
 main :: IO ()
 main = do
     gameData <- bouncingCirclesInitialData --initialGameData
-    let gameData' = last $ take 3000000000 $ iterate gameLoop gameData
+    let gameData' = last $ take 300 $ iterate gameLoop gameData
+    print $ space $ physics gameData'
     return $ DeepSeq.deepseq gameData' ()
 
 gameLoop :: GameData -> GameData

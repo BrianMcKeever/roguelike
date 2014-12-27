@@ -91,9 +91,10 @@ Test-Suite spec
   Hs-Source-Dirs:       Tests
   Ghc-Options:          -Wall -threaded
   Main-Is:              Spec.hs
-  Build-Depends:        base
-                      , roguebard
-                      , hspec
-                      , linear
-        ,vector-algorithms
-                      , vector
+  Build-Depends:        base,
+                      containers,
+                      roguebard,
+                      hspec,
+                      linear,
+                      vector-algorithms,
+                      vector

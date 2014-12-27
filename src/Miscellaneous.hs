@@ -1,6 +1,5 @@
 module Miscellaneous (
-    bouncingCirclesInitialData,
-    trace
+    bouncingCirclesInitialData
 )
 where
 import Components.Physics

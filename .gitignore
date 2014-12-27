@@ -7,3 +7,4 @@ dist
 *.swp
 cabal.sandbox.config
 midi2text
+/.dist-buildwrapper/

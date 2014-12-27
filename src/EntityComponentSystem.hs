@@ -10,6 +10,7 @@ module EntityComponentSystem (
     Masks,
     maxEntities,
     trace,
+    traceMessage,
     unnessary
 )
 where
@@ -17,7 +18,7 @@ import Data.Bits
 import Data.List
 import Data.Word
 import qualified Data.Vector as Vector
-import qualified Debug.Trace as Debug
+import Debug.Trace as Debug
 
 data Component = EmptyComponent 
     | PhysicsComponent 
@@ -53,8 +54,8 @@ type Masks = Vector.Vector Mask
 maxEntities :: Int
 maxEntities = 3000
 
-trace :: (Show a) => String -> a -> a
-trace s a = Debug.trace (s ++ show a) a
+traceMessage :: (Show a) => String -> a -> a
+traceMessage s a = Debug.trace (s ++ " " ++ show a) a
 
 unnessary :: a
 unnessary = error "an argument that was thought unecessary was evaluated"

@@ -2,15 +2,22 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module Components.Physics (
     BucketIndexEntity(..),
-    Collision,
+    Collision(..),
     createCollision,
     createSpace,
+    detailedCollision,
+    detailedCollisionCheck,
+    Edge(..),
+    edgeToAxis,
     getEntitiesInBox,
     getDisplacement,
     EntityPhysics(..),
+    gatherCollisions,
     Physics(..),
     physicsMask,
     physicsUpdate,
+    project,
+    projectShapes,
     initialPhysics,
     Shape(..),
     Space,
@@ -33,7 +40,8 @@ import Linear.Epsilon
 import Linear.Metric hiding (project)
 import Linear.V2
 import Linear.Vector
-import Prelude as Prelude hiding ((++), concat, filter, foldl, init, last, length, map, maximum, minimum, replicate, sequence, span, sum, unzip, zip) 
+import Prelude as Prelude 
+    hiding ((++), concat, filter, foldl, init, last, length, map, maximum, minimum, null, replicate, sequence, span, sum, unzip, zip) 
 import Vector
 
 newtype BucketIndexEntity = BucketIndexEntity (Int, Entity)
@@ -80,7 +88,7 @@ calculateCollisionResult2 :: (Epsilon a, Ord a, Floating a) => Entity -> Entity 
 calculateCollisionResult2 entity1 entity2 maybeOverlapPair =
     if isJust maybeOverlapPair
     then let (displacement, axis) = fromJust maybeOverlapPair in
-        Just $ createCollision entity1 entity2 displacement $ normalize axis
+        Just $ createCollision entity1 entity2 displacement axis
     else Nothing
 
 -- | Entity a, entity b, minimum displacement, minimum displacement axis. A < B
@@ -103,7 +111,8 @@ type Collisions a = Set.Set (Collision a)
 createCollision :: (Ord a, Floating a) => Entity -> Entity -> a -> V2 a -> Collision a
 createCollision a b displacement axis
     | a < b     = Collision a b displacement axis
-    | otherwise = Collision b a displacement axis
+    | b > a = Collision b a displacement axis
+    | otherwise = error "collided with self"
 
 -- | Spaces are vectors of vectors that contain entities that are all within the
 -- same bucket.
@@ -128,7 +137,7 @@ createSpace bucketWidth bucketHeight mapHeight mapWidth input = result
 detailedCollision :: (Epsilon a, Floating a, Ord a) => Entity -> Shape a -> Entity -> Shape a -> Maybe (Collision a)
 detailedCollision entity1 circle1@(Circle _ center1 _) entity2 circle2@(Circle _ center2 _) = result
     where
-    axis = pointsToSeparatingAxis center1 center2
+    axis = pointsToAxis center1 center2
     maybeOverlap = projectShapes circle1 circle2 axis
     result = calculateCollisionResult2 entity1 entity2 maybeOverlap
 
@@ -204,8 +213,8 @@ data Edge = Edge PointIndex PointIndex
 --We can't reference the point directly because this is Haskell. Instead, we are
 --saving the vector indexes of the points that form the edges of our object.
 
-edgeToAxis :: Num a => Vector (Point V2 a) -> Edge -> V2 a
-edgeToAxis points (Edge i j) = pointsToSeparatingAxis (points ! i)  $ points ! j 
+edgeToAxis :: (Epsilon a, Floating a, Num a) => Vector (Point V2 a) -> Edge -> V2 a
+edgeToAxis points (Edge i j) = normalize $ perp $ (pointToV2 $ points ! i) - (pointToV2 $ points ! j)
 
 --edgeToV2Pair :: Num a => Vector (Point V2 a) -> Edge -> (V2 a, V2 a)
 --edgeToV2Pair points (Edge i j) = (pointToV2 $ points ! i, pointToV2 $ points ! j)
@@ -217,24 +226,30 @@ data EntityPhysics a = EntityPhysics {
     invertedMass :: ! a,
     shape :: ! (Shape a)
     }
+    deriving (Show)
 
 instance NFData (EntityPhysics a) where
     rnf (EntityPhysics f iS iT iM s) = rnf (seq f (), rnf iS, rnf iT, seq iM (), rnf s)
 
-gatherCollisions :: (Epsilon a, Eq a, Floating a, Ord a) => Vector (EntityPhysics a) -> Vector Entity -> Collisions a
-gatherCollisions physics' entities' = ifoldl' collide Set.empty $ init entities'
+-- | This method takes the EntityPhysics data and a bucket of entities, 
+-- collides all of the entities against each othes, and then returns a set of
+-- Collisions.
+gatherCollisions :: (Show a, Epsilon a, Eq a, Floating a, Ord a) => Vector (EntityPhysics a) -> Vector Entity -> Collisions a
+gatherCollisions physics' entities' = if len < 2 then Set.empty else result
     where
     len = length entities'
 
-    --collide :: Collisions a -> Int -> Entity -> Collisions a
-    collide collisions i entity = foldl' (f entity) collisions $ slice (i + 1) len entities'
+    --doCollisions :: Collisions a -> Int -> Entity -> Collisions a
+    doCollisions collisions i entity = traceMessage "foldl gatherCollisions" $ foldl' (collide entity) collisions $ traceMessage "collide" $ slice (i + 1) (len - 1) entities'
 
-    --f :: Entity -> Collisions a -> Entity -> Collisions a
-    f entity1 collisions' entity2 = 
-        let maybeCollision = detailedCollision entity1 (shape $ physics' ! fromIntegral entity1) entity2 (shape $ physics' ! fromIntegral entity2) in
-        if isNothing maybeCollision
-        then collisions'
-        else Set.insert (fromJust maybeCollision) collisions'
+    --collide :: Entity -> Collisions a -> Entity -> Collisions a
+    collide entity1 collisions' entity2 = 
+        let maybeCollision = traceMessage "mc" $ detailedCollision entity1 (shape $ physics' ! fromIntegral entity1) entity2 (shape $ physics' ! fromIntegral entity2) in
+        case maybeCollision of
+            Nothing -> collisions'
+            Just collision -> Set.insert (collision) collisions'
+
+    result = traceMessage "result" $ ifoldl' doCollisions Set.empty $ traceMessage "init" $ init $ traceMessage "entities" entities'
 
 getAABBSeparatingAxis :: Num a => Vector (V2 a)
 getAABBSeparatingAxis = fromList [V2 0 1, V2 1 0]
@@ -259,16 +274,14 @@ getCenterOfBucket bucketWidth bucketHeight (P (V2 x y)) = P (V2 (startX + halfWi
     halfWidth = fromIntegral bucketWidth / 2
     halfHeight = fromIntegral bucketHeight / 2
 
-getCircleSeparatingAxis :: (Floating a, Ord a, Num a) => Shape a -> Shape a -> V2 a
-getCircleSeparatingAxis (Circle _ center _) (Polygon _ points _ _) = circleAxis
+getCircleSeparatingAxis :: (Epsilon a, Floating a, Ord a, Num a) => Shape a -> Shape a -> V2 a
+getCircleSeparatingAxis (Circle _ center _) (Polygon _ points _ _) = pointsToAxis closestPoint center
     where
-    v2 = pointToV2 $ getClosestPointToCenter center points
-    circleAxis = perp v2
-getCircleSeparatingAxis (Circle _ center _) aabb@(AABB _ _ _ _) = circleAxis
+    closestPoint = getClosestPointToCenter center points
+getCircleSeparatingAxis (Circle _ center _) aabb@(AABB _ _ _ _) = pointsToAxis closestPoint center
     where
     points = aabbToPoints aabb
-    v2 = pointToV2 $ getClosestPointToCenter center points
-    circleAxis = perp v2
+    closestPoint = getClosestPointToCenter center points
 getCircleSeparatingAxis _ _ = 
     error "getCircleSeparatingAxis should only be called with a circle and a polygon (in that order) or circle and aabb (in that order)"
 
@@ -315,7 +328,7 @@ getEntitiesInBox bucketWidth bucketHeight mapWidth physics displayWidth displayH
     --TODO we only need to check the entities in the buckets around the
     --edges
 
-getPolygonSeparatingAxis :: Num a => Shape a -> Vector (V2 a)
+getPolygonSeparatingAxis :: (Epsilon a, Floating a, Num a) => Shape a -> Vector (V2 a)
 getPolygonSeparatingAxis (Polygon _ points edges _) = map (edgeToAxis points) edges
 getPolygonSeparatingAxis _ = error "getPolygonSeparatingAxis should only be called with polygons"
 
@@ -373,6 +386,7 @@ data Physics a = Physics {
     remainingCollisions :: ! (Collisions a),
     space :: ! Space
     }
+    deriving (Show)
 
 instance NFData (Physics a) where
     rnf (Physics ep nc nlc rc s) = rnf (rnf ep, rnf nc, rnf nlc, rnf rc, rnf s)
@@ -381,7 +395,7 @@ physicsMask :: Mask
 physicsMask = componentToMask PhysicsComponent
 
 physicsUpdate :: 
-    (Epsilon a, Eq a, Floating a, RealFrac a) =>
+    (Show a, Epsilon a, Eq a, Floating a, RealFrac a) =>
     Int -> -- bucketWidth
     Int -> -- bucketHeight
     Int -> -- mapWidth
@@ -410,8 +424,8 @@ physicsUpdate bucketWidth bucketHeight mapWidth mapHeight numberRelaxations tick
 
 type PointIndex = Int
 
-pointsToSeparatingAxis :: Num a => Point V2 a -> Point V2 a -> V2 a
-pointsToSeparatingAxis point1 point2 = perp $ (pointToV2 point1) - (pointToV2 $ point2) 
+pointsToAxis :: (Epsilon a, Floating a, Num a) => Point V2 a -> Point V2 a -> V2 a
+pointsToAxis point1 point2 = normalize $ (pointToV2 point1) - (pointToV2 $ point2) 
 
 pointToV2 ::  Point V2 a -> V2 a
 pointToV2 (P a) = a
@@ -460,65 +474,45 @@ processCollisions collisions physics = runST $ do
                     MVector.write physics' (fromIntegral entity1) newEntityPhysics'
 
 -- | This method projects a shape onto an axis and returns the start and end on
--- that axis.
--- >>> project (V2 0 1) $ Polygon unnessary (fromList [P (V2 1 1), P (V2 2 1), P (V2 1.5 2)]) empty  empty
--- (1.0,2.0)
--- >>> project (V2 1 0) $ Polygon unnessary (fromList [P (V2 1 1), P (V2 2 1), P (V2 1.5 2)]) empty  empty
--- (1.0,2.0)
--- >>> project (V2 1 1) $ Polygon unnessary (fromList [P (V2 1 1), P (V2 2 1), P (V2 1.5 2)]) empty  empty
--- (1.414213562373095,2.474873734152916)
--- >>> project (V2 0 1) (Circle unnessary (P (V2 1 1)) 1)
--- (0.0,2.0)
--- >>> project (V2 1 0) (Circle unnessary (P (V2 1 1)) 1)
--- (0.0,2.0)
--- >>> project (V2 1 1) (Circle unnessary (P (V2 1 1)) 1)
--- (0.4142135623730949,2.414213562373095)
--- >>> project (V2 0 1) (AABB unnessary (P (V2 2 2)) 1 1)
--- (1.0,3.0)
--- >>> project (V2 1 0) (AABB unnessary (P (V2 2 2)) 1 1)
--- (1.0,3.0)
--- >>> project (V2 1 1) (AABB unnessary (P (V2 2 2)) 1 1)
--- (1.414213562373095,4.242640687119285)
+-- that axis. The axis argument should be normalized.
 project :: (Ord a, Num a, Floating a, Epsilon a) => V2 a -> Shape a -> (a, a)
 project axis (Circle _ center radius) = (c - radius, c + radius)
 --http://board.flashkit.com/board/showthread.php?787281-Separating-Axis-Theorem
     where
-    normalizedAxis = normalize axis
-    c = dot (pointToV2 center) normalizedAxis
-project axis (AABB _ (P center) halfWidth halfHeight) = ((b - r), b + r)
+    c = dot (pointToV2 center) axis
+project axis@(V2 x y) (AABB _ (P center) halfWidth halfHeight) = ((b - r), b + r)
 --http://en.wikipedia.org/wiki/Bounding_volume#Basic_intersection_checks
     where
-    normalizedAxis@(V2 x y) = normalize axis
     r = halfWidth * abs x + halfHeight * abs y
     --TODO I'm not sure whether x and y should be absolute valued or get the
     --magnitude of center
-    b = dot center normalizedAxis
+    b = dot center axis
 project axis (Polygon _ points _ _) = (minimum projected, maximum projected)
 --http://www.codezealot.org/archives/55
 --"Projecting a shape onto an axis"
     where
     v2s = map pointToV2 points
-    normalizedAxis = normalize axis
-    projected = map (\ a -> dot a normalizedAxis) v2s
+    projected = map (\ a -> dot a axis) v2s
 
+-- | This method will project both shapes onto an axis. 
 projectShapes :: (Epsilon a, Ord a, Floating a) => Shape a -> Shape a -> V2 a -> Maybe (a, V2 a)
 projectShapes shape1 shape2 axis = fmap (flip (,) axis) $ getDisplacement overlap1 overlap2
     where
     overlap1 = project axis shape1
     overlap2 = project axis shape2
 
-relax :: (Epsilon a, Eq a, Floating a, Fractional a, Ord a) => 
+relax :: (Show a, Epsilon a, Eq a, Floating a, Fractional a, Ord a) => 
     Space -> Vector Mask -> (Collisions a, Vector (EntityPhysics a)) -> (Collisions a, Vector (EntityPhysics a))
 relax space' masks (_, entityP) = (collisions, constrainedPhysics)
     where 
     (collisions, entityPhysics') = resolveCollisions space' entityP
     constrainedPhysics = satisfyConstraints $ zip masks entityPhysics'
 
-resolveCollisions :: (Epsilon a, Eq a, Floating a, Ord a) => Space -> Vector (EntityPhysics a) -> (Collisions a, Vector (EntityPhysics a))
+resolveCollisions :: (Epsilon a, Eq a, Floating a, Ord a, Show a) => Space -> Vector (EntityPhysics a) -> (Collisions a, Vector (EntityPhysics a))
 resolveCollisions space' physics = (combinedCollisions, newPhysics)
     where
-    collisions = map (gatherCollisions physics) space'
-    combinedCollisions = foldl' (\c cs -> Set.union c cs) Set.empty collisions
+    collisions = trace "roar" $ map (gatherCollisions physics) space'
+    combinedCollisions = trace "nofar" $ foldl' (\c cs -> Set.union c cs) Set.empty collisions
     newPhysics = processCollisions combinedCollisions physics
 
 data Shape a = 
