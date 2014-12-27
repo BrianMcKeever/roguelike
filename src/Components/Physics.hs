@@ -86,10 +86,15 @@ calculateCollisionResult entity1 left entity2 right = calculateCollisionResult2 
 
 calculateCollisionResult2 :: (Epsilon a, Ord a, Floating a) => Entity -> Entity -> Maybe (a, V2 a) -> Maybe (Collision a)
 calculateCollisionResult2 entity1 entity2 maybeOverlapPair =
+    case maybeOverlapPair of
+        Just (displacement, axis) -> Just $ createCollision entity1 entity2 displacement axis
+        Nothing -> Nothing
+    {-
     if isJust maybeOverlapPair
     then let (displacement, axis) = fromJust maybeOverlapPair in
         Just $ createCollision entity1 entity2 displacement axis
     else Nothing
+    -}
 
 -- | Entity a, entity b, minimum displacement, minimum displacement axis. A < B
 data Collision a = Collision Entity Entity a (V2 a)
@@ -110,9 +115,9 @@ type Collisions a = Set.Set (Collision a)
 
 createCollision :: (Ord a, Floating a) => Entity -> Entity -> a -> V2 a -> Collision a
 createCollision a b displacement axis
-    | a < b     = Collision a b displacement axis
-    | b > a = Collision b a displacement axis
-    | otherwise = error "collided with self"
+    | a < b = Collision a b displacement axis
+    | a > b = Collision b a displacement axis
+    | otherwise = error $ "collided with self"
 
 -- | Spaces are vectors of vectors that contain entities that are all within the
 -- same bucket.
@@ -240,16 +245,22 @@ gatherCollisions physics' entities' = if len < 2 then Set.empty else result
     len = length entities'
 
     --doCollisions :: Collisions a -> Int -> Entity -> Collisions a
-    doCollisions collisions i entity = traceMessage "foldl gatherCollisions" $ foldl' (collide entity) collisions $ traceMessage "collide" $ slice (i + 1) (len - 1) entities'
+    doCollisions collisions i entity = collisions'
+        where
+        front = i + 1
+        back = len - front
+        collisions' = foldl' (collide entity) collisions $ slice front back entities'
 
     --collide :: Entity -> Collisions a -> Entity -> Collisions a
     collide entity1 collisions' entity2 = 
-        let maybeCollision = traceMessage "mc" $ detailedCollision entity1 (shape $ physics' ! fromIntegral entity1) entity2 (shape $ physics' ! fromIntegral entity2) in
+        let shape1 = shape $ physics' ! fromIntegral entity1
+            shape2 = shape $ physics' ! fromIntegral entity2
+            maybeCollision = detailedCollision entity1 shape1 entity2 shape2 in
         case maybeCollision of
             Nothing -> collisions'
             Just collision -> Set.insert (collision) collisions'
 
-    result = traceMessage "result" $ ifoldl' doCollisions Set.empty $ traceMessage "init" $ init $ traceMessage "entities" entities'
+    result = ifoldl' doCollisions Set.empty $ init entities'
 
 getAABBSeparatingAxis :: Num a => Vector (V2 a)
 getAABBSeparatingAxis = fromList [V2 0 1, V2 1 0]
@@ -424,8 +435,11 @@ physicsUpdate bucketWidth bucketHeight mapWidth mapHeight numberRelaxations tick
 
 type PointIndex = Int
 
-pointsToAxis :: (Epsilon a, Floating a, Num a) => Point V2 a -> Point V2 a -> V2 a
-pointsToAxis point1 point2 = normalize $ (pointToV2 point1) - (pointToV2 $ point2) 
+pointsToAxis :: (Epsilon a, Eq a, Floating a, Num a) => Point V2 a -> Point V2 a -> V2 a
+pointsToAxis point1 point2 = result
+    where
+    difference = (pointToV2 point1) - (pointToV2 point2)
+    result = if difference == V2 0 0 then V2 0 1 else normalize difference
 
 pointToV2 ::  Point V2 a -> V2 a
 pointToV2 (P a) = a
@@ -511,8 +525,8 @@ relax space' masks (_, entityP) = (collisions, constrainedPhysics)
 resolveCollisions :: (Epsilon a, Eq a, Floating a, Ord a, Show a) => Space -> Vector (EntityPhysics a) -> (Collisions a, Vector (EntityPhysics a))
 resolveCollisions space' physics = (combinedCollisions, newPhysics)
     where
-    collisions = trace "roar" $ map (gatherCollisions physics) space'
-    combinedCollisions = trace "nofar" $ foldl' (\c cs -> Set.union c cs) Set.empty collisions
+    collisions = map (gatherCollisions physics) space'
+    combinedCollisions = foldl' (\c cs -> Set.union c cs) Set.empty collisions
     newPhysics = processCollisions combinedCollisions physics
 
 data Shape a = 

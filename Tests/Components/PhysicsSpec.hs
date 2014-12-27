@@ -100,6 +100,30 @@ spec = do
             let entities = fromList [0,1]
             shouldBe (gatherCollisions ep entities) Set.empty
 
+        it "1 collision" $ do
+            let entityP1 = (EntityPhysics (V2 1 2) False False 10 (Circle (P (V2 0 0)) (P (V2 0 1)) 5)) :: EntityPhysics Double
+            let entityP2 = (EntityPhysics (V2 1 2) False False 10 (Circle (P (V2 0 0)) (P (V2 0 5)) 5)) :: EntityPhysics Double
+            let ep = fromList [entityP1, entityP2]
+            let entities = fromList [0,1]
+            shouldBe (gatherCollisions ep entities) $ Set.fromList [Collision 0 1 6 (V2 0 (-1))]
+
+        it "3 collisions" $ do
+            let entityP1 = (EntityPhysics (V2 1 2) False False 10 (Circle (P (V2 0 0)) (P (V2 0 1)) 5)) :: EntityPhysics Double
+            let entityP2 = (EntityPhysics (V2 1 2) False False 10 (Circle (P (V2 0 0)) (P (V2 0 5)) 5)) :: EntityPhysics Double
+            let entityP3 = (EntityPhysics (V2 1 2) False False 10 (Circle (P (V2 0 0)) (P (V2 0 5)) 5)) :: EntityPhysics Double
+            let ep = fromList [entityP1, entityP2, entityP3]
+            let entities = fromList [0,1,2]
+            shouldBe (gatherCollisions ep entities) $ 
+                Set.fromList [Collision 0 1 6 (V2 0 (-1)), Collision 0 2 6 (V2 0 (-1)), Collision 1 2 10 (V2 0 1)]
+
+        it "3 entities no collisions" $ do
+            let entityP1 = (EntityPhysics (V2 1 2) False False 10 (Circle (P (V2 0 0)) (P (V2 0 1)) 1)) :: EntityPhysics Double
+            let entityP2 = (EntityPhysics (V2 1 2) False False 10 (Circle (P (V2 0 0)) (P (V2 0 5)) 1)) :: EntityPhysics Double
+            let entityP3 = (EntityPhysics (V2 1 2) False False 10 (Circle (P (V2 0 0)) (P (V2 0 10)) 1)) :: EntityPhysics Double
+            let ep = fromList [entityP1, entityP2, entityP3]
+            let entities = fromList [0,1,2]
+            shouldBe (gatherCollisions ep entities) $ Set.empty
+
     describe "project" $ do
         it "polygon" $ do
             let result = project (V2 0 1) $ Polygon empty (fromList [P (V2 1 1), P (V2 2 1), P (V2 1.5 2)]) empty  empty :: (Double, Double)
