@@ -12,6 +12,7 @@ import qualified Data.Vector as Vector
 import EntityComponentSystem
 import GameState
 import qualified Graphics.Gloss.Data.Picture as Gloss
+import qualified Graphics.Gloss.Data.Color as Gloss2
 import Linear.Affine
 import Linear.V2
 import System.Random
@@ -21,29 +22,31 @@ bouncingCirclesInitialData :: IO GameData
 bouncingCirclesInitialData = do
     mapFile <- loadMapFile "assets/tile_map.tmx"
     tiles' <- loadTiles mapFile
-    let radius = 2
-    let circlePicture = Gloss.Circle radius
-    entityPhysics' <- Vector.replicateM maxEntities createRandomEntityPhysics
+    let radius = 32
+    let circlePicture = Gloss.color Gloss2.rose $ Gloss.circleSolid radius
+    let numberEntities = 30
+    entityPhysics' <- Vector.replicateM numberEntities createRandomEntityPhysics
     return GameData {
-        masks = Vector.replicate maxEntities $ createMask [PhysicsComponent, RenderableComponent],
+        masks = Vector.replicate numberEntities $ createMask [PhysicsComponent, RenderableComponent],
         physics = Physics entityPhysics' Set.empty Set.empty Set.empty Vector.empty,
         player = -666,
         randomState = mkStdGen 1,
-        renderData = Vector.replicate maxEntities (RenderData Torso circlePicture),
+        renderData = Vector.replicate numberEntities (RenderData Torso circlePicture),
         tiledMap = mapFile,
         tiles = tiles'
     }
 
-createRandomEntityPhysics :: IO (EntityPhysics Double)
+createRandomEntityPhysics :: IO (EntityPhysics Float)
 createRandomEntityPhysics = do
-    let radius = 2
+    let radius = 32
     let force' = V2 0 0
     let mass = 10
     let dimension = 200 * 16 * 4
-    x <- randomRIO (0, dimension)
-    y <- randomRIO (0, dimension)
+    let maxSpeed = 2
+    x <- randomRIO (0, 64 * 4)
+    y <- randomRIO (0, 64 * 4)
     let oldPosition = P (V2 x y)
-    xDelta <- randomRIO ((-10), 10)
-    yDelta <- randomRIO ((-10), 10)
+    xDelta <- randomRIO ((-maxSpeed), maxSpeed)
+    yDelta <- randomRIO ((-maxSpeed), maxSpeed)
     let newPosition = P (V2 (x + xDelta) (y + yDelta))
     return $ EntityPhysics force' False False mass $ Circle oldPosition newPosition radius

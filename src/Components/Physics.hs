@@ -9,6 +9,7 @@ module Components.Physics (
     detailedCollisionCheck,
     Edge(..),
     edgeToAxis,
+    getCenter,
     getEntitiesInBox,
     getDisplacement,
     EntityPhysics(..),
@@ -21,6 +22,7 @@ module Components.Physics (
     initialPhysics,
     Shape(..),
     Space,
+    toBucket,
     toBuckets
 )
 where
@@ -327,13 +329,13 @@ getEntitiesInBox bucketWidth bucketHeight mapWidth physics displayWidth displayH
     numberXBuckets =  ceiling $ (fromIntegral displayWidth / fromIntegral bucketWidth :: a) :: Int
     numberYBuckets = ceiling $ (fromIntegral displayHeight / fromIntegral bucketHeight :: a) :: Int
 
-    xs = Vector.enumFromStepN (centerX + 0.5 * fromIntegral displayWidth) (fromIntegral bucketWidth) $ fromIntegral numberXBuckets
-    ys = Vector.enumFromStepN (centerY + 0.5 * fromIntegral displayHeight) (fromIntegral (-bucketHeight)) $ fromIntegral numberYBuckets
+    xs = filter (>0) $ Vector.enumFromStepN (centerX + 0.5 * fromIntegral displayWidth) (fromIntegral bucketWidth) $ fromIntegral numberXBuckets
+    ys = filter (>0) $ Vector.enumFromStepN (centerY + 0.5 * fromIntegral displayHeight) (fromIntegral (-bucketHeight)) $ fromIntegral numberYBuckets
     coordinatesInBuckets = flip (V2) <$> ys <*> xs
     space' = space physics
     entities = concatVector $ map (\ coordinate -> space' ! (toBucket bucketWidth bucketHeight mapWidth coordinate)) coordinatesInBuckets
     uniqueEntities = removeDuplicates entities
-    aabb = AABB unnessary center (fromIntegral displayWidth * 0.5) (fromIntegral displayHeight * 0.5)
+    aabb = AABB (P $ V2 0 0) center (fromIntegral displayWidth * 0.5) (fromIntegral displayHeight * 0.5)
     entityPhysics' = entityPhysics physics
     result = filter (\entity -> detailedCollisionCheck (shape $ entityPhysics' ! fromIntegral entity) aabb) uniqueEntities
     --TODO we only need to check the entities in the buckets around the
@@ -604,24 +606,6 @@ sin45 = sqrt 2 / 2
 
 -- | This method will convert the position to the correct bucketIndex. It assumes
 -- the position it is given is valid and on the map.
--- >>> toBucket 1 1 100 $ V2 5 0
--- 5
--- >>> toBucket 1 1 100 $ V2 5.4524 1.23423
--- 105
--- >>> toBucket 10 10 100 $ V2 5.4524 1.23423
--- 0
--- >>> toBucket 10 10 100 $ V2 50 9.99999
--- 5
--- >>> toBucket 10 10 100 $ V2 50 10
--- 15
--- >>> toBucket 10 10 100 $ V2 50 11
--- 15
--- >>> toBucket 10 10 100 $ V2 50 10
--- 15
--- >>> toBucket 10 10 100 $ V2 50 10
--- 15
--- >>> toBucket 1 1 12800 $ V2 352 352
--- 4505952
 toBucket :: (RealFrac a, Floating a) => Int -> Int -> Int -> V2 a -> Int
 toBucket bucketWidth bucketHeight mapWidth (V2 x y) = floor $ left + right
     where

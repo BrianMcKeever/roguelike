@@ -17,6 +17,7 @@ import Graphics.Gloss.Juicy
 import Data.Maybe as Maybe
 import qualified Data.Tiled as Tiled
 import qualified Data.Vector as Vector
+import Linear.V2
 
 crop :: Int -> Int -> Int -> Int -> DynamicImage -> DynamicImage
 crop leftOffset topOffset width height = dynamicPixelMap squareImage
@@ -70,8 +71,8 @@ pixelScale :: Float
 pixelScale = scaleFactor * tileDimension
 
 -- | Returns a picture of the tiles on the screen centered on x,y
-renderArea :: Vector.Vector Picture -> Tiled.TiledMap -> (Float, Float) -> Picture
-renderArea tiles tiledMap (x, y) = translate xOffset yOffset $ pictures tilePictures
+renderArea :: Vector.Vector Picture -> Tiled.TiledMap -> V2 Float -> Picture
+renderArea tiles tiledMap (V2 x y) = translate xOffset yOffset $ pictures tilePictures
     where
     layer = head $ Tiled.mapLayers tiledMap -- we are ensuring the first layer is the floor layer in loadTiles
     xs = Vector.enumFromStepN (floor x - sightRangeX) 1 numberHorizontalTiles

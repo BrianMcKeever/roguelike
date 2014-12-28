@@ -14,7 +14,6 @@ import Data.Vector.Algorithms.Intro
 import EntityComponentSystem
 import Graphics.Gloss.Data.Picture hiding (Point, Vector)
 import Linear.Affine
-import Linear.Epsilon
 import Linear.V2
 import Prelude as Prelude hiding ((++), concat, filter, foldl, init, last, length, map, maximum, minimum, replicate, sequence, span, sum, unzip, zip) 
 
@@ -43,8 +42,8 @@ instance Eq RenderData where
 instance Ord RenderData where
     compare (RenderData index1 _) (RenderData index2 _) = compare index1 index2
 
-renderEntities :: (Show a, Epsilon a, Floating a, Ord a, RealFrac a) => 
-    Int -> Int -> Int -> Physics a -> Masks -> Vector RenderData -> Int -> Int -> Point V2 a -> Picture
+renderEntities :: 
+    Int -> Int -> Int -> Physics Float -> Masks -> Vector RenderData -> Int -> Int -> Point V2 Float -> Picture
 renderEntities bucketWidth bucketHeight mapWidth physics' masks' renderData displayWidth displayHeight center = result
     -- Grab the entities in the buckets covering the screen.
     -- Filter ids that don't have Renderable component.
@@ -52,7 +51,16 @@ renderEntities bucketWidth bucketHeight mapWidth physics' masks' renderData disp
     where
     entities = getEntitiesInBox bucketWidth bucketHeight mapWidth physics' displayWidth displayHeight center
     renderable = filter (\ entity -> hasMask (masks' ! fromIntegral entity)  renderableMask) entities
-    renderData' = map (\ entity -> renderData ! fromIntegral entity) renderable
+    renderData' = map getRenderData renderable
+
+    getRenderData :: Entity -> RenderData
+    getRenderData entity = renderD
+        where
+        (RenderData zIndex picture) = renderData ! fromIntegral entity
+        (P (V2 x y)) = getCenter $ shape $ entityPhysics physics' ! fromIntegral entity
+        translatedPicture = Translate x (-y) picture
+        renderD = RenderData zIndex translatedPicture
+
     sorted = runST $ do
         thawed <- thaw renderData'
         sort thawed

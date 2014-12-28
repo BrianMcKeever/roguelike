@@ -21,7 +21,7 @@ import Tiles
 data GameData = GameData {
     masks :: ! Masks,
     player :: ! Entity,
-    physics :: ! (Physics Double),
+    physics :: ! (Physics Float),
     randomState :: ! StdGen,
     renderData :: ! (Vector.Vector RenderData),
     tiledMap :: ! TiledMap,

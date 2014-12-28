@@ -191,6 +191,24 @@ spec = do
             let shape2 = Circle (P (V2 0 0)) (P (V2 0 0)) 5 :: Shape Double
             shouldBe (projectShapes shape1 shape2 axis) $ Just (10.0, V2 1.0 0.0)
 
+    describe "toBucket" $ do
+        it "basic" $ do
+            shouldBe (toBucket 1 1 100 $ V2 (5 :: Double) 0) 5
+        it "rounding" $ do
+            shouldBe (toBucket 1 1 100 $ V2 (5.4524 :: Double) 1.23423) 105
+        it "bigger buckets" $ do
+            shouldBe (toBucket 10 10 100 $ V2 (5.4524 :: Double) 1.23423) 0
+        it "rounding bigger bucket" $ do
+            shouldBe (toBucket 10 10 100 $ V2 (50 :: Double) 9.99999) 5
+        it "moar bucket" $ do
+            shouldBe (toBucket 10 10 100 $ V2 (50 :: Double) 10) 15
+        it "moooar" $ do
+            shouldBe (toBucket 10 10 100 $ V2 (50 :: Double) 11) 15
+        it "moooar2" $ do
+            shouldBe (toBucket 1 1 12800 $ V2 (352 :: Double) 352) 4505952
+        it "was bug" $ do
+            shouldBe (toBucket 64 64 12800 $ V2 (352 :: Double) (-32)) (-195)
+
     describe "toBuckets" $ do
         it "circles centered" $ do
             let shape' = Circle (P (V2 5 5 )) (P (V2 25 25)) 4.9 :: Shape Double
@@ -207,4 +225,4 @@ spec = do
         it "circles hangs off board" $ do
             let shape' = Circle (P (V2 5 5 )) (P (V2 0 0)) 4.9 :: Shape Double
             shouldBe (toBuckets 10 10 100 shape') $ fromList [0]
-
+            
