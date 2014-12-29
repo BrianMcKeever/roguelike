@@ -26,12 +26,13 @@ bouncingCirclesInitialData = do
     let circlePicture = Gloss.color Gloss2.rose $ Gloss.circleSolid radius
     let numberEntities = 30
     entityPhysics' <- Vector.replicateM numberEntities createRandomEntityPhysics
+    let stationaryCircle = Vector.singleton $ EntityPhysics (V2 0 0) False False 10 $ Circle (P (V2 0 0)) (P (V2 0 0)) 5
     return GameData {
-        masks = Vector.replicate numberEntities $ createMask [PhysicsComponent, RenderableComponent],
-        physics = Physics entityPhysics' Set.empty Set.empty Set.empty Vector.empty,
+        masks = Vector.replicate (numberEntities + 1) $ createMask [PhysicsComponent, RenderableComponent],
+        physics = Physics (entityPhysics' Vector.++ stationaryCircle) Set.empty Set.empty Set.empty Vector.empty,
         player = -666,
         randomState = mkStdGen 1,
-        renderData = Vector.replicate numberEntities (RenderData Torso circlePicture),
+        renderData = Vector.replicate (numberEntities + 1) (RenderData Torso circlePicture),
         tiledMap = mapFile,
         tiles = tiles'
     }
@@ -49,4 +50,5 @@ createRandomEntityPhysics = do
     xDelta <- randomRIO ((-maxSpeed), maxSpeed)
     yDelta <- randomRIO ((-maxSpeed), maxSpeed)
     let newPosition = P (V2 (x + xDelta) (y + yDelta))
+    --let newPosition = P (V2 0 0)
     return $ EntityPhysics force' False False mass $ Circle oldPosition newPosition radius

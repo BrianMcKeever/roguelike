@@ -329,8 +329,8 @@ getEntitiesInBox bucketWidth bucketHeight mapWidth physics displayWidth displayH
     numberXBuckets =  ceiling $ (fromIntegral displayWidth / fromIntegral bucketWidth :: a) :: Int
     numberYBuckets = ceiling $ (fromIntegral displayHeight / fromIntegral bucketHeight :: a) :: Int
 
-    xs = filter (>0) $ Vector.enumFromStepN (centerX + 0.5 * fromIntegral displayWidth) (fromIntegral bucketWidth) $ fromIntegral numberXBuckets
-    ys = filter (>0) $ Vector.enumFromStepN (centerY + 0.5 * fromIntegral displayHeight) (fromIntegral (-bucketHeight)) $ fromIntegral numberYBuckets
+    xs = filter (>0) $ Vector.enumFromStepN (centerX - 0.5 * fromIntegral displayWidth) (fromIntegral bucketWidth) $ fromIntegral numberXBuckets
+    ys = filter (>0) $ Vector.enumFromStepN (centerY - 0.5 * fromIntegral displayHeight) (fromIntegral (bucketHeight)) $ fromIntegral numberYBuckets
     coordinatesInBuckets = flip (V2) <$> ys <*> xs
     space' = space physics
     entities = concatVector $ map (\ coordinate -> space' ! (toBucket bucketWidth bucketHeight mapWidth coordinate)) coordinatesInBuckets
@@ -393,11 +393,11 @@ moveShape (Polygon oldPoints points edges constraints) movementVector = Polygon 
 --overlaps a b = isJust $ getDisplacement a b
 
 data Physics a = Physics {
-    entityPhysics :: ! (Vector (EntityPhysics a)),
-    newCollisions :: ! (Collisions a),
-    noLongerCollisions :: ! (Collisions a),
-    remainingCollisions :: ! (Collisions a),
-    space :: ! Space
+    entityPhysics :: (Vector (EntityPhysics a)),
+    newCollisions :: (Collisions a),
+    noLongerCollisions :: (Collisions a),
+    remainingCollisions :: (Collisions a),
+    space :: Space
     }
     deriving (Show)
 
@@ -532,12 +532,12 @@ resolveCollisions space' physics = (combinedCollisions, newPhysics)
     newPhysics = processCollisions combinedCollisions physics
 
 data Shape a = 
-    Circle !(Point V2 a) !(Point V2 a) !a -- oldCenter, center, radius
-    | AABB !(Point V2 a) !(Point V2 a) !a !a -- oldCenter, center, halfWidth halfHeight
-    | Polygon !(Vector (Point V2 a)) --oldPoints
-              !(Vector (Point V2 a)) --points
-              !(Vector Edge) 
-              !(Vector (LineConstraint a)) 
+    Circle (Point V2 a) (Point V2 a) a -- oldCenter, center, radius
+    | AABB (Point V2 a) (Point V2 a) a a -- oldCenter, center, halfWidth halfHeight
+    | Polygon (Vector (Point V2 a)) --oldPoints
+              (Vector (Point V2 a)) --points
+              (Vector Edge) 
+              (Vector (LineConstraint a)) 
     --  Complex Point (Vector Shape) (Vector ComplexLineConstraint)
     deriving (Show)
 

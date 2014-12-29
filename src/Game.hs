@@ -42,7 +42,7 @@ draw gameData = if Vector.length space' == 0 then Blank else pictures [area, ent
     physics' = physics gameData
     masks' = masks gameData
     renderData' = renderData gameData
-    entities = renderEntities bucketWidth bucketHeight mapWidth physics' masks' renderData' displayWidth displayHeight (P (V2 0 0))
+    entities = renderEntities bucketWidth bucketHeight mapWidth physics' masks' renderData' displayWidth displayHeight (P (V2 (5*64) (5*64)))
 
 handleInput :: Event -> GameData -> GameData
 handleInput _ gameData = gameData

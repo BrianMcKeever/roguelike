@@ -3,12 +3,13 @@ import Game
 import GameState
 import Miscellaneous
 import qualified Control.DeepSeq as DeepSeq
+import qualified Data.Vector as Vector
 
 main :: IO ()
 main = do
     gameData <- bouncingCirclesInitialData --initialGameData
     let gameData' = last $ take 300 $ iterate gameLoop gameData
-    print $ space $ physics gameData'
+    print $ Vector.last $ space $ physics gameData'
     return $ DeepSeq.deepseq gameData' ()
 
 gameLoop :: GameData -> GameData

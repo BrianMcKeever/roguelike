@@ -1,8 +1,8 @@
-dist\build\rogue\rogue.exe +RTS -p -hc
-hp2ps -e8in -c rogue.hp
+dist\build\main\main.exe +RTS -p -hc
+hp2ps -e8in -c main.hp
 
 how to see stack trace
-dist\build\rogue\rogue.exe +RTS -xc
+dist\build\main\main.exe +RTS -xc
 
 dist\build\profile\profile.exe +RTS -p -hc
 hp2ps -e8in -c profile.hp
