@@ -75,7 +75,7 @@ bucketize gridSize xs = unfoldrN gridSize generate' (0, unwrapped)
         thawed <- thaw wrapped
         Intro.sort thawed
         freeze thawed
-    unwrapped = map (\ (BucketIndexEntity (a, b)) -> (a, b)) sorted
+    unwrapped = map (\ (BucketIndexEntity a) -> a) sorted
     generate' (a, b) = Just (next, (a + 1, remaining))
         where
         (matching, remaining) = span ((==) a . fst) b
@@ -242,7 +242,7 @@ instance NFData (EntityPhysics a) where
 -- collides all of the entities against each othes, and then returns a set of
 -- Collisions.
 gatherCollisions :: (Show a, Epsilon a, Eq a, Floating a, Ord a) => Vector (EntityPhysics a) -> Vector Entity -> Collisions a
-gatherCollisions physics' entities' = if len < 2 then Set.empty else result
+gatherCollisions physics' entities' = result
     where
     len = length entities'
 
@@ -527,8 +527,12 @@ relax space' masks (_, entityP) = (collisions, constrainedPhysics)
 resolveCollisions :: (Epsilon a, Eq a, Floating a, Ord a, Show a) => Space -> Vector (EntityPhysics a) -> (Collisions a, Vector (EntityPhysics a))
 resolveCollisions space' physics = (combinedCollisions, newPhysics)
     where
-    collisions = map (gatherCollisions physics) space'
-    combinedCollisions = foldl' (\c cs -> Set.union c cs) Set.empty collisions
+    --collisions = map (gatherCollisions physics) space'
+    --combinedCollisions = foldl' (\c cs -> Set.union c cs) Set.empty collisions
+    -- It might be faster to do it this commented out way on multiple
+    -- processors.
+    spaceWithCollisions = filter (\bucket -> length bucket > 1) space'
+    combinedCollisions = foldl' (\s bucket -> Set.union s $ gatherCollisions physics bucket) Set.empty spaceWithCollisions
     newPhysics = processCollisions combinedCollisions physics
 
 data Shape a = 
