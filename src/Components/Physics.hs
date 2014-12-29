@@ -422,13 +422,14 @@ physicsUpdate bucketWidth bucketHeight mapWidth mapHeight numberRelaxations tick
     where
     integratedPhysics = verletIntegration tick $ zip masks $ entityPhysics physics
     space' = createSpace bucketWidth bucketHeight mapHeight mapWidth $ zip masks integratedPhysics
-    (collisions, onceRelaxedPhysics) = resolveCollisions space' integratedPhysics
+    spaceWithCollisions = filter (\bucket -> length bucket > 1) space'
+    (collisions, onceRelaxedPhysics) = resolveCollisions spaceWithCollisions integratedPhysics
     oldCollisions = remainingCollisions physics
     newCollisions' = Set.difference collisions oldCollisions
 
     maybeRelax x = Just $ (result, result)
         where
-        result = relax space' masks x
+        result = relax spaceWithCollisions masks x
 
     (remainingCollisions', entityPhysics') = last $ unfoldrN numberRelaxations maybeRelax (Set.empty, onceRelaxedPhysics)
     noLongerCollisions' = Set.difference oldCollisions remainingCollisions'
@@ -531,8 +532,7 @@ resolveCollisions space' physics = (combinedCollisions, newPhysics)
     --combinedCollisions = foldl' (\c cs -> Set.union c cs) Set.empty collisions
     -- It might be faster to do it this commented out way on multiple
     -- processors.
-    spaceWithCollisions = filter (\bucket -> length bucket > 1) space'
-    combinedCollisions = foldl' (\s bucket -> Set.union s $ gatherCollisions physics bucket) Set.empty spaceWithCollisions
+    combinedCollisions = foldl' (\s bucket -> Set.union s $ gatherCollisions physics bucket) Set.empty space'
     newPhysics = processCollisions combinedCollisions physics
 
 data Shape a = 
