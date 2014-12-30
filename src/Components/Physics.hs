@@ -69,13 +69,13 @@ bucketize :: Int ->
     Space
 bucketize gridSize xs = map fromList lists
     where
-    lists = runST $ do 
+    lists = create $ do 
         space' <- MVector.replicate gridSize []
         let prepend (i, entity) = do
                 bucket <- MVector.read space' i
                 MVector.write space' i (entity : bucket)
         Vector.mapM_ prepend xs
-        freeze space'
+        return space'
 
 calculateCollisionResult :: (Epsilon a, Ord a, Floating a) => Entity -> Maybe (a, V2 a) -> Entity -> Maybe (a, V2 a) -> Maybe (Collision a)
 calculateCollisionResult entity1 left entity2 right = calculateCollisionResult2 entity1 entity2 maybeOverlapPair
