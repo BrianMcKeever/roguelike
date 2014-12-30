@@ -223,11 +223,11 @@ edgeToAxis points (Edge i j) = normalize $ perp $ (pointToV2 $ points ! i) - (po
 --edgeToV2Pair points (Edge i j) = (pointToV2 $ points ! i, pointToV2 $ points ! j)
 
 data EntityPhysics a = EntityPhysics {
-    force :: ! (V2 a),
-    isStatic :: ! Bool, 
-    isTrigger :: ! Bool, 
-    invertedMass :: ! a,
-    shape :: ! (Shape a)
+    force :: (V2 a),
+    isStatic :: Bool, 
+    isTrigger :: Bool, 
+    invertedMass :: a,
+    shape :: (Shape a)
     }
     deriving (Show)
 
@@ -353,7 +353,7 @@ initialPhysics = Physics (replicate maxEntities ep) Set.empty Set.empty Set.empt
 data LineConstraint a = LineConstraint PointIndex PointIndex a -- distance 
     deriving (Show)
 
--- This integrates the point using verletIntegration and returns newPoint.
+-- | This integrates the point using verletIntegration and returns newPoint.
 integratePoint :: (Floating a, Num a) => a -> V2 a -> a -> Point V2 a -> Point V2 a -> Point V2 a
 integratePoint tick force' invertedMass' oldPoint point = 2 *^ point - oldPoint + (P force' ^* invertedMass') ^* tick ** 2
 
