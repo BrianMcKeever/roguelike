@@ -36,7 +36,6 @@ import Data.Maybe
 import qualified Data.Set as Set
 import Data.Vector as Vector
 import qualified Data.Vector.Mutable as MVector
-import qualified Data.Vector.Algorithms.Intro as Intro
 import Linear.Affine
 import Linear.Epsilon
 import Linear.Metric hiding (project)
@@ -68,16 +67,15 @@ aabbToPoints _ = error "aabbToPoints called on something other than aabb"
 bucketize :: Int -> 
     Vector (Int, Entity) -> 
     Space
-bucketize gridSize xs = unfoldrN gridSize generate' (0, sorted)
+bucketize gridSize xs = map fromList lists
     where
-    sorted = runST $ do 
-        thawed <- thaw xs
-        Intro.sortBy (\(a,_) (b,_) -> compare a b) thawed
-        freeze thawed
-    generate' (a, b) = Just (next, (a + 1, remaining))
-        where
-        (matching, remaining) = span ((==) a . fst) b
-        next = map snd matching
+    lists = runST $ do 
+        space' <- MVector.replicate gridSize []
+        let prepend (i, entity) = do
+                bucket <- MVector.read space' i
+                MVector.write space' i (entity : bucket)
+        Vector.mapM_ prepend xs
+        freeze space'
 
 calculateCollisionResult :: (Epsilon a, Ord a, Floating a) => Entity -> Maybe (a, V2 a) -> Entity -> Maybe (a, V2 a) -> Maybe (Collision a)
 calculateCollisionResult entity1 left entity2 right = calculateCollisionResult2 entity1 entity2 maybeOverlapPair
@@ -630,7 +628,7 @@ toBuckets bucketWidth bucketHeight mapWidth (Circle _ (P center) radius) = resul
     northEast = center + V2 ( orthagonal)   orthagonal
     southWest = center + V2 (-orthagonal) (-orthagonal)
     southEast = center + V2 ( orthagonal) (-orthagonal)
-    result = filter (>= 0) $ fromList $ Set.toList $ Set.fromList $ 
+    result = filter (\x -> x >= 0 && x < 40000) $ fromList $ Set.toList $ Set.fromList $ 
         fmap (toBucket bucketWidth bucketHeight mapWidth) [north, south, east, west, northWest, northEast, southWest, southEast]
 toBuckets bucketWidth bucketHeight mapWidth (AABB _ (P center) halfWidth halfHeight) = result
     where
