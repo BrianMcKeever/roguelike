@@ -68,14 +68,12 @@ aabbToPoints _ = error "aabbToPoints called on something other than aabb"
 bucketize :: Int -> 
     Vector (Int, Entity) -> 
     Space
-bucketize gridSize xs = unfoldrN gridSize generate' (0, unwrapped)
+bucketize gridSize xs = unfoldrN gridSize generate' (0, sorted)
     where
-    wrapped = map BucketIndexEntity xs
     sorted = runST $ do 
-        thawed <- thaw wrapped
-        Intro.sort thawed
+        thawed <- thaw xs
+        Intro.sortBy (\(a,_) (b,_) -> compare a b) thawed
         freeze thawed
-    unwrapped = map (\ (BucketIndexEntity a) -> a) sorted
     generate' (a, b) = Just (next, (a + 1, remaining))
         where
         (matching, remaining) = span ((==) a . fst) b
